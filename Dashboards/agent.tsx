@@ -27,56 +27,56 @@ export const Agent = (props: { navigation: { navigate: (arg0: string) => void; }
   const [socket, setSocket] = useState<ReturnType<typeof socketio> | null>(
     null,
   );
-  const initializeSocket = async () => {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (!token) {
-        console.warn('No authToken found in AsyncStorage');
-        return;
-      }
+  // const initializeSocket = async () => {
+  //   try {
+  //     const token = await AsyncStorage.getItem('authToken');
+  //     if (!token) {
+  //       console.warn('No authToken found in AsyncStorage');
+  //       return;
+  //     }
 
-      const socketInstance = socketio(`${SOCKET_URI}`, {
-        withCredentials: true,
-        auth: { token },
-      });
+  //     const socketInstance = socketio(`${SOCKET_URI}`, {
+  //       withCredentials: true,
+  //       auth: { token },
+  //     });
 
-      // Listen for the incoming call event
-      socketInstance.on('acceptCall', (data) => {
-        console.log('Incoming call data:', data);
-        // Redirect to calling_acceptance screen
-        props.navigation.navigate('calling_acceptance', { caller: data.caller });
-      });
+  //     // Listen for the incoming call event
+  //     socketInstance.on('acceptCall', (data) => {
+  //       console.log('Incoming call data:', data);
+  //       // Redirect to calling_acceptance screen
+  //       props.navigation.navigate('calling_acceptance', { caller: data.caller });
+  //     });
 
-      socketInstance.on('connect', () => {
-        console.log('Socket connected:', socketInstance.id);
-      });
+  //     socketInstance.on('connect', () => {
+  //       console.log('Socket connected:', socketInstance.id);
+  //     });
 
-      socketInstance.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-        Alert.alert('Error', 'Failed to connect to the server.');
-      });
+  //     socketInstance.on('connect_error', (error) => {
+  //       console.error('Socket connection error:', error);
+  //       Alert.alert('Error', 'Failed to connect to the server.');
+  //     });
 
-      socketInstance.on('disconnect', () => {
-        console.log('Socket disconnected');
-      });
+  //     socketInstance.on('disconnect', () => {
+  //       console.log('Socket disconnected');
+  //     });
 
-      setSocket(socketInstance);
-    } catch (error) {
-      console.error('Error initializing socket:', error);
-      Alert.alert('Error', 'Failed to initialize socket connection.');
-    }
-  };
+  //     setSocket(socketInstance);
+  //   } catch (error) {
+  //     console.error('Error initializing socket:', error);
+  //     Alert.alert('Error', 'Failed to initialize socket connection.');
+  //   }
+  // };
 
-  useEffect(() => {
-    initializeSocket();
+  // useEffect(() => {
+  //   initializeSocket();
 
-    return () => {
-      if (socket) {
-        console.log('Cleaning up socket connection...');
-        socket.disconnect();
-      }
-    };
-  }, []);
+  //   return () => {
+  //     if (socket) {
+  //       console.log('Cleaning up socket connection...');
+  //       socket.disconnect();
+  //     }
+  //   };
+  // }, []);
 
   const toggleSwitch = () => setIsAvailable(previousState => !previousState);
   return (

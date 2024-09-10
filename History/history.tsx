@@ -1,41 +1,94 @@
 import React, {useEffect, useState} from 'react';
-import {Image, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
+import {Image, StyleSheet, Text, View, TouchableOpacity, Alert} from 'react-native';
 import apiClient from '../apiClient';
 import WaveLoader, {Phonecall, Phonecall_white} from '../Common/icon';
 import FooterBar from '../Common/footer';
-import {useSocket} from '../context/socket';
+// import {useSocket} from '../context/socket';
 import {LocalStorage} from '../utils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import socketio from 'socket.io-client';
+//@ts-ignore
+import {SOCKET_URI} from '@env';
 
 export const History = ({navigation}: {navigation: any}) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const {socket} = useSocket();
+  const [socket, setSocket] = useState<ReturnType<typeof socketio> | null>(
+    null,
+  );
+  // const initializeSocket = async () => {
+  //   try {
+  //     const token = await AsyncStorage.getItem('authToken');
+  //     if (!token) {
+  //       console.warn('No authToken found in AsyncStorage');
+  //       return;
+  //     }
+
+  //     const socketInstance = socketio(`${SOCKET_URI}`, {
+  //       withCredentials: true,
+  //       auth: {token},
+        
+  //     });
+
+  //     // Set up socket event listeners
+  //     socketInstance.on('connect', () => {
+  //       console.log('Socket connected:', socketInstance.id);
+  //     });
+
+  //     socketInstance.on('connect_error', error => {
+  //       console.error('Socket connection error:', error);
+  //       Alert.alert('Error', 'Failed to connect to the server.');
+  //     });
+
+  //     socketInstance.on('disconnect', () => {
+  //       console.log('Socket disconnected');
+  //     });
+
+  //     setSocket(socketInstance);
+  //   } catch (error) {
+  //     console.error('Error initializing socket:', error);
+  //     Alert.alert('Error', 'Failed to initialize socket connection.');
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   initializeSocket();
+
+  //   return () => {
+  //     if (socket) {
+  //       console.log('Cleaning up socket connection...');
+  //       socket.disconnect();
+  //     }
+  //   };
+  // }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('chats/agents');
+      const response = await apiClient.get('chats/');
       setData(response.data.data);
+      // const token = await AsyncStorage.getItem('authToken');
+      // console.log(token);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
       setLoading(false);
     }
   };
-
+  // console.log(data);
   const createOrOpenChat = async (id: string, name: string) => {
     try {
       const response = await apiClient.post(`chats/c/${id}`);
       const chat = response.data.chat;
-  
+      // console.log(chat)
       // Store chat info and navigate to chat room with the friend's name
       LocalStorage.set('currentChat', chat);
       navigation.navigate('Chat', { chatId: chat._id, friendName: name });
   
       // Notify server about the new chat
-      if (socket) {
-        socket.emit('joinChat', chat._id);
-      }
+      // if (socket) {
+      //   socket.emit('joinChat', chat._id);
+      // }
     } catch (error) {
       console.error('Error creating or opening chat:', error);
     }
@@ -57,10 +110,10 @@ export const History = ({navigation}: {navigation: any}) => {
           </View>
         ) : (
           data.map(friend => (
-            <React.Fragment key={friend._id}>
+            <React.Fragment key={friend.participants[1]._id}>
               <TouchableOpacity
                 style={styles.friend_container}
-                onPress={() => createOrOpenChat(friend._id, friend.username)}>
+                onPress={() => createOrOpenChat(friend.participants[1]._id, friend.participants[1].username)}>
                 <View style={styles.friendsub_container}>
                   <View style={styles.img_container}>
                     <Image
@@ -70,8 +123,8 @@ export const History = ({navigation}: {navigation: any}) => {
                     />
                   </View>
                   <View style={styles.name_container}>
-                    <Text style={styles.name}>{friend.username}</Text>
-                    <Text style={styles.date_time}>{new Date(friend.updatedAt).toLocaleString()}</Text>
+                    <Text style={styles.name}>{friend.participants[1].username}</Text>
+                    <Text style={styles.date_time}>{new Date(friend.participants[1].updatedAt).toLocaleString()}</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.button}>
@@ -96,14 +149,14 @@ const styles = StyleSheet.create({
     backgroundColor:'#fff'
   },
   container: {
-    flex: 1,
+    // flex: 1,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   friend_container: {
     flexDirection: 'row',
-    marginTop: 5,
+    marginVertical: 10,
     width: '100%',
     borderRadius: 10,
     justifyContent: 'space-between',

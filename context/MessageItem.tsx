@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 //   message: ChatMessageInterface;
 //   onDelete: (message: ChatMessageInterface) => void;
 // }
-
+//@ts-ignore
 const MessageItem = ({message, onDelete}) => {
   const [userId, setUserId] = useState(null);
   const [messages1, setMessage] = useState(null);
@@ -15,6 +15,7 @@ const MessageItem = ({message, onDelete}) => {
     const fetchUserId = async () => {
       const id = await AsyncStorage.getItem('user_id');
       // console.log(id);
+      //@ts-ignore
       setUserId(id);
     };
 
@@ -24,11 +25,12 @@ const MessageItem = ({message, onDelete}) => {
   }, []);
   // console.log('message is:', messages1 && messages1.data);
   // console.log('user id is:', userId);
-  let lastDisplayedDate = null; // Track the last displayed date
+  let lastDisplayedDate: string | null = null; // Track the last displayed date
 
   return (
     <View style={styles.container}>
-      {messages1 &&
+      {messages1 && 
+      //@ts-ignore
         messages1.data.map(
           (
             message: {

@@ -47,14 +47,16 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
         return;
       }
 
-      const socketInstance = socketio(`${SOCKET_URI}`, {
+      const socketInstance = socketio('https://driverse.onrender.com', {
+        transports: ['websocket'],
         withCredentials: true,
         auth: {token},
+        
       });
 
       // Set up socket event listeners
       socketInstance.on('connect', () => {
-        // console.log('Socket connected:', socketInstance.id);
+        console.log('Socket connected:', socketInstance.id);
       });
 
       socketInstance.on('connect_error', error => {
@@ -93,7 +95,8 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
         await getMessages(chatId);
 
         if (socket) {
-          socket.emit('joinChat', chatId);
+          const join = socket.emit('joinChat', chatId);
+          // console.log(join)
         }
       }
     };
@@ -152,7 +155,7 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
   const sendChatMessage = async () => {
     // console.log('Sending message...');
     if (!currentChat?._id || !socket) return;
-  
+    // console.log(currentChat._id)
     socket.emit('stopTyping', currentChat._id);
   
     try {
@@ -165,7 +168,7 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
         //@ts-ignore
         null,
         () => {
-          // console.log('Message sent successfully');
+          console.log('Message sent successfully');
           setMessage('');
           setAttachedFiles([]);
           getMessages(currentChat._id);
@@ -220,6 +223,26 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
           <ScrollView style={styles.message_container}>
             <MessageItem message={messages} onDelete={deleteMessage} />
           </ScrollView>
+          {/* <FlatList
+            data={messages}
+            keyExtractor={item => item._id}
+            renderItem={({ item }) => <MessageItem message={item} onDelete={deleteMessage} />}
+            inverted
+          /> */}
+          {/* <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              value={message}
+              onChangeText={text => {
+                setMessage(text);
+                handleOnMessageChange(text);
+              }}
+              placeholder="Type a message..."
+            />
+            <TouchableOpacity style={styles.button} onPress={sendChatMessage}>
+              <Text style={styles.buttonText}>Send</Text>
+            </TouchableOpacity>
+          </View> */}
         </View>
       ) : (
         <Text>No chat selected</Text>

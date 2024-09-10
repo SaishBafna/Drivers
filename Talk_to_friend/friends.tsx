@@ -1,15 +1,68 @@
 import React, {useEffect, useState} from 'react';
-import {Image, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
+import {Image, StyleSheet, Text, View, TouchableOpacity, Alert} from 'react-native';
 import apiClient from '../apiClient';
 import WaveLoader, {Phonecall, Phonecall_white} from '../Common/icon';
 import FooterBar from '../Common/footer';
-import {useSocket} from '../context/socket';
+// import {useSocket} from '../context/socket';
 import {LocalStorage} from '../utils';
+import socketio from 'socket.io-client';
+import {SOCKET_URI} from '@env';
+
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const Friends = ({navigation}: {navigation: any}) => {
   const [data, setData] = useState([]);
+  const [socket, setSocket] = useState<ReturnType<typeof socketio> | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
-  const {socket} = useSocket();
+  // const initializeSocket = async () => {
+  //   try {
+  //     const token = await AsyncStorage.getItem('authToken');
+  //     if (!token) {
+  //       console.warn('No authToken found in AsyncStorage');
+  //       return;
+  //     }
+
+  //     const socketInstance = socketio('https://driverse.onrender.com', {
+  //       transports: ['websocket'] ,
+  //       withCredentials: true,
+  //       auth: {token},
+        
+  //     });
+
+  //     // Set up socket event listeners
+  //     socketInstance.on('connect', () => {
+  //       console.log('Socket connected:', socketInstance.id);
+  //     });
+
+  //     socketInstance.on('connect_error', error => {
+  //       console.error('Socket connection error:', error);
+  //       Alert.alert('Error', 'Failed to connect to the server.');
+  //     });
+
+  //     socketInstance.on('disconnect', () => {
+  //       console.log('Socket disconnected');
+  //     });
+
+  //     setSocket(socketInstance);
+  //   } catch (error) {
+  //     console.error('Error initializing socket:', error);
+  //     Alert.alert('Error', 'Failed to initialize socket connection.');
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   initializeSocket();
+
+  //   return () => {
+  //     if (socket) {
+  //       console.log('Cleaning up socket connection...');
+  //       socket.disconnect();
+  //     }
+  //   };
+  // }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -27,15 +80,15 @@ export const Friends = ({navigation}: {navigation: any}) => {
     try {
       const response = await apiClient.post(`chats/c/${id}`);
       const chat = response.data.chat;
-  
+      // console.log(chat, chat.participants[0])
       // Store chat info and navigate to chat room with the friend's name
       LocalStorage.set('currentChat', chat);
       navigation.navigate('Chat', { chatId: chat._id, friendName: name, AgentID: id });
   
       // Notify server about the new chat
-      if (socket) {
-        socket.emit('joinChat', chat._id);
-      }
+      // if (socket) {
+      //   socket.emit('joinChat', chat._id);
+      // }
     } catch (error) {
       console.error('Error creating or opening chat:', error);
     }

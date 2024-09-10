@@ -56,6 +56,8 @@ import Mechanic_Profile from './Accounts/Mechanic_profile';
 import Company_Profile from './Accounts/Company_Profile';
 import Vehicle_Details from './Vehicle/vehicle_details';
 import { Add_vehicle } from './Vehicle/add_vehicle';
+import WebRTCComponent from './call';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 enableScreens();
 
@@ -169,7 +171,14 @@ function App(): React.JSX.Element {
             headerLeft: () => (
               <View style={styles.headerLeftContainer}>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('Friends')}>
+          onPress={async () => {
+            const serviceType = await AsyncStorage.getItem('serviceType');
+            if (serviceType === '9494') {
+              navigation.navigate('History');
+            } else {
+              navigation.navigate('Friends');
+            }
+          }}>
                   <Back_icon />
                 </TouchableOpacity>
                 <View style={styles.imgContainer}>
@@ -425,6 +434,14 @@ function App(): React.JSX.Element {
           options={{
             headerTransparent: false,
             headerTitle: 'Add Vehicle',
+          }}
+        />
+        <Stack.Screen
+          name="Call"
+          component={WebRTCComponent}
+          options={{
+            headerTransparent: false,
+            headerTitle: 'Call',
           }}
         />
         <Stack.Screen

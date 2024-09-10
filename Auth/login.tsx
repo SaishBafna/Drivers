@@ -93,7 +93,7 @@ export const Login = (props: {
       <PasswordInput passwordvalue={password} passwordpass={setPassword} />
 
       <CustomButton icon={<></>} title="Continue" onPress={handleLogin} />
-      {/* <CustomButton icon={<></>} title="Continue" onPress={() => props.navigation.navigate('Home')} /> */}
+      {/* <CustomButton icon={<></>} title="Continue" onPress={() => props.navigation.navigate('Call')} /> */}
 
       <View style={styles.linkContainer}>
         <Text
