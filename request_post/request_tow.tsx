@@ -107,7 +107,7 @@ const handleSubmit = async () => {
   });
 
   try {
-    console.log(formData)
+    
     const response = await apiClient.post('/userTowRequest', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',

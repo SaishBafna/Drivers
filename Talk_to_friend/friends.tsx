@@ -80,7 +80,7 @@ export const Friends = ({navigation}: {navigation: any}) => {
     try {
       const response = await apiClient.post(`chats/c/${id}`);
       const chat = response.data.chat;
-      // console.log(chat, chat.participants[0])
+      console.log(chat, chat.participants[0])
       // Store chat info and navigate to chat room with the friend's name
       LocalStorage.set('currentChat', chat);
       navigation.navigate('Chat', { chatId: chat._id, friendName: name, AgentID: id });

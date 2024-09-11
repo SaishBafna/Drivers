@@ -40,11 +40,10 @@ export const Login = (props: {
     try {
       let res = await axios.post(`${API_URL}login`,payload)
       const data = res.data;
-      await AsyncStorage.setItem('authToken', data.token);
+      await AsyncStorage.setItem('authToken', data.accessToken);
     await AsyncStorage.setItem('user_id', data._id);
     await AsyncStorage.setItem('refreshToken', data.refreshToken);
     await AsyncStorage.setItem('serviceType', data.serviceType.toString());
-
       if(res.status === 200){
         if(res.data.serviceType === 9494){
           props.navigation.navigate('Agent');

@@ -75,12 +75,12 @@ export const History = ({navigation}: {navigation: any}) => {
       setLoading(false);
     }
   };
-  // console.log(data);
+  console.log(data);
   const createOrOpenChat = async (id: string, name: string) => {
     try {
       const response = await apiClient.post(`chats/c/${id}`);
       const chat = response.data.chat;
-      // console.log(chat)
+      console.log(chat)
       // Store chat info and navigate to chat room with the friend's name
       LocalStorage.set('currentChat', chat);
       navigation.navigate('Chat', { chatId: chat._id, friendName: name });
@@ -110,10 +110,10 @@ export const History = ({navigation}: {navigation: any}) => {
           </View>
         ) : (
           data.map(friend => (
-            <React.Fragment key={friend.participants[1]._id}>
+            <React.Fragment key={friend.participants[0]._id}>
               <TouchableOpacity
                 style={styles.friend_container}
-                onPress={() => createOrOpenChat(friend.participants[1]._id, friend.participants[1].username)}>
+                onPress={() => createOrOpenChat(friend.participants[0]._id, friend.participants[0].username)}>
                 <View style={styles.friendsub_container}>
                   <View style={styles.img_container}>
                     <Image
@@ -123,8 +123,8 @@ export const History = ({navigation}: {navigation: any}) => {
                     />
                   </View>
                   <View style={styles.name_container}>
-                    <Text style={styles.name}>{friend.participants[1].username}</Text>
-                    <Text style={styles.date_time}>{new Date(friend.participants[1].updatedAt).toLocaleString()}</Text>
+                    <Text style={styles.name}>{friend.participants[0].username}</Text>
+                    <Text style={styles.date_time}>{new Date(friend.participants[0].updatedAt).toLocaleString()}</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.button}>

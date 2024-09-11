@@ -104,13 +104,15 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
     fetchChat();
   }, [route.params, socket]);
 
+  // console.log("Current chat id:",currentChat._id)
+
   const getMessages = async (chatId: string) => {
     try {
       if (chatId) {
         setLoadingMessages(true);
         const response = await getChatMessages(chatId);
-        setMessages(response.data || []);
-        // console.log(response.data);
+        setMessages(response.data.data || []);
+        console.log(response.data.data);
       }
     } catch (error) {
       console.error('Error fetching chat messages:', error);
@@ -153,33 +155,52 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
   };
   
   const sendChatMessage = async () => {
-    // console.log('Sending message...');
     if (!currentChat?._id || !socket) return;
-    // console.log(currentChat._id)
+  
     socket.emit('stopTyping', currentChat._id);
   
     try {
-      // console.log('About to send message');
-      await requestHandler(
-        async () => {
-          // console.log('Request handler called');
-          return await sendMessage(currentChat._id, message, attachedFiles);
-        },
-        //@ts-ignore
-        null,
-        () => {
-          console.log('Message sent successfully');
-          setMessage('');
-          setAttachedFiles([]);
-          getMessages(currentChat._id);
-        },
-        Alert.alert
-      );
+        const response = await requestHandler(() =>
+            sendMessage(currentChat._id, message, attachedFiles)
+        );
+
+        const newMessage = response?.data.data; // Ensure it's a valid message
+    
+        if (!newMessage) {
+            throw new Error("Invalid message received from API.");
+        }
+  
+        // console.log('newMessage:', newMessage);
+        // console.log('prevMessages:', messages);
+
+        // Check if prevMessages is an array before spreading
+        setMessages(prevMessages => Array.isArray(prevMessages) ? [...prevMessages, newMessage] : [newMessage]);
+        
+        setMessage('');
+        setAttachedFiles([]);
+        
     } catch (error) {
-      console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message.');
+        console.error('Error sending message:', error);
+        Alert.alert('Error', 'Failed to send message.');
     }
-  };
+};
+
+  
+  useEffect(() => {
+    // console.log("out of receive message socket get called")
+
+    if (socket && currentChat?._id) {
+      console.log("in the if condition")
+
+    socket.on('messageReceived', (newMessage) => {
+        setMessages(prevMessages => Array.isArray(prevMessages) ? [...prevMessages, newMessage] : [newMessage]);
+      });
+      
+      return () => {
+        socket.off('messageReceived'); // Clean up listener when component unmounts
+      };
+    }
+  }, [socket, currentChat]);
   
   
   const requestHandler = async (request: () => Promise<any>, onSuccess?: () => void, onSuccessCallback?: () => void, onError?: (message: string) => void) => {
@@ -202,6 +223,7 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
         clearTimeout(typingTimeoutRef.current);
       }
       socket.emit('typing', currentChat?._id);
+     
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit('stopTyping', currentChat?._id);
       }, 3000);
@@ -220,9 +242,15 @@ const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
   {currentChat ? (
         <View style={styles.container}>
           
-          <ScrollView style={styles.message_container}>
+          {/* <ScrollView style={styles.message_container}>
             <MessageItem message={messages} onDelete={deleteMessage} />
+          </ScrollView> */}
+          <ScrollView style={styles.message_container} contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+              {messages && messages.map((msg) => (
+                <MessageItem key={msg._id} message={msg} onDelete={deleteMessage} />
+              ))}
           </ScrollView>
+
           {/* <FlatList
             data={messages}
             keyExtractor={item => item._id}

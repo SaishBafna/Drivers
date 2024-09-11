@@ -37,6 +37,8 @@ const sendMessage = async (chatId: string, content: string, attachments: File[])
     });
   });
 
+  console.log(formData);
+
   try {
     const response = await apiClient.post(`/messages/${chatId}`, formData, {
       headers: {
