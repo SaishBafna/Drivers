@@ -51,16 +51,16 @@ import CallingAcceptance from './Talk_to_friend/call_acceptance';
 import Towing from './Dashboards/towing';
 import Company from './Dashboards/company';
 import Agent from './Dashboards/agent';
-import { History } from './History/history';
+import {History} from './History/history';
 import Mechanic_Profile from './Accounts/Mechanic_profile';
 import Company_Profile from './Accounts/Company_Profile';
 import Vehicle_Details from './Vehicle/vehicle_details';
-import { Add_vehicle } from './Vehicle/add_vehicle';
+import {Add_vehicle} from './Vehicle/add_vehicle';
 import WebRTCComponent from './call';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Update_vehicle} from './Vehicle/update_vehicle';
 
 enableScreens();
-
 
 const Stack = createNativeStackNavigator();
 
@@ -171,14 +171,16 @@ function App(): React.JSX.Element {
             headerLeft: () => (
               <View style={styles.headerLeftContainer}>
                 <TouchableOpacity
-          onPress={async () => {
-            const serviceType = await AsyncStorage.getItem('serviceType');
-            if (serviceType === '9494') {
-              navigation.navigate('History');
-            } else {
-              navigation.navigate('Friends');
-            }
-          }}>
+                  onPress={async () => {
+                    const serviceType = await AsyncStorage.getItem(
+                      'serviceType',
+                    );
+                    if (serviceType === '9494') {
+                      navigation.navigate('History');
+                    } else {
+                      navigation.navigate('Friends');
+                    }
+                  }}>
                   <Back_icon />
                 </TouchableOpacity>
                 <View style={styles.imgContainer}>
@@ -189,7 +191,6 @@ function App(): React.JSX.Element {
                   />
                 </View>
                 <Text style={styles.friendName}>
-                  
                   {route.params?.friendName || 'Friend'}
                 </Text>
               </View>
@@ -297,7 +298,7 @@ function App(): React.JSX.Element {
             headerLeft: () => (
               <>
                 {/* <IconamoonMenuBurgerHorizontal /> */}
-                <Text style={{ fontSize: 25}}>Drivers</Text>
+                <Text style={{fontSize: 25}}>Drivers</Text>
               </>
             ), // This hides the back button
             headerRight: () => <ClarityNotificationLine />,
@@ -312,7 +313,7 @@ function App(): React.JSX.Element {
             headerLeft: () => (
               <>
                 {/* <IconamoonMenuBurgerHorizontal /> */}
-                <Text style={{ fontSize: 25}}>Drivers</Text>
+                <Text style={{fontSize: 25}}>Drivers</Text>
               </>
             ), // This hides the back button
             headerRight: () => <ClarityNotificationLine />,
@@ -327,7 +328,7 @@ function App(): React.JSX.Element {
             headerLeft: () => (
               <>
                 {/* <IconamoonMenuBurgerHorizontal /> */}
-                <Text style={{ fontSize: 25}}>Drivers</Text>
+                <Text style={{fontSize: 25}}>Drivers</Text>
               </>
             ), // This hides the back button
             headerRight: () => <ClarityNotificationLine />,
@@ -342,7 +343,7 @@ function App(): React.JSX.Element {
             headerLeft: () => (
               <>
                 {/* <IconamoonMenuBurgerHorizontal /> */}
-                <Text style={{ fontSize: 25}}>Drivers</Text>
+                <Text style={{fontSize: 25}}>Drivers</Text>
               </>
             ), // This hides the back button
             headerRight: () => <ClarityNotificationLine />,
@@ -396,7 +397,7 @@ function App(): React.JSX.Element {
             headerTitle: 'Help',
           }}
         />
-         <Stack.Screen
+        <Stack.Screen
           name="calling"
           component={CallingScreen}
           options={{
@@ -404,7 +405,7 @@ function App(): React.JSX.Element {
             headerTitle: 'Call',
           }}
         />
-         <Stack.Screen
+        <Stack.Screen
           name="calling_acceptance"
           component={CallingAcceptance}
           options={{
@@ -438,12 +439,22 @@ function App(): React.JSX.Element {
         />
         <Stack.Screen
           name="Call"
+          //@ts-ignore
           component={WebRTCComponent}
           options={{
             headerTransparent: false,
             headerTitle: 'Call',
           }}
         />
+        <Stack.Screen
+          name="Edit Vehicle"
+          component={Update_vehicle}
+          options={{
+            headerTransparent: false,
+            headerTitle: 'Edit Vehicle',
+          }}
+        />
+
         <Stack.Screen
           name="Vehicle_Details"
           component={Vehicle_Details}
@@ -464,7 +475,6 @@ function App(): React.JSX.Element {
             ),
           })}
         />
-        
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -529,12 +539,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000',
   },
-  Add_vehicle:{
-    padding:10,
-    backgroundColor:'#000',
-    borderRadius:10,
-    color:'#fff',
-    fontSize:15
+  Add_vehicle: {
+    padding: 10,
+    backgroundColor: '#000',
+    borderRadius: 10,
+    color: '#fff',
+    fontSize: 15,
   },
 });
 

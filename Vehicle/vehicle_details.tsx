@@ -1,78 +1,135 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Image,
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
+  Alert,
   TouchableOpacity,
   ScrollView,
-  Alert,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import FooterBar from '../Common/footer';
-import {
-    Information_icon,
-  Information_icon_dark,
-  Location_icon1,
-  Phonecall,
-  Phonecall_light,
-  Question_icon,
-  Rightarrow,
-  Settings_icon,
-  Star_icon,
-  Verify_Tick,
-} from '../Common/icon';
-//@ts-ignore
-import { apiClient } from '../apiClient';
-import { AxiosError } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import apiClient from '../apiClient';
+import { Delete_icon } from '../Common/icon';
 
 export const Vehicle_Details = (props: {
-  navigation: {navigate: (arg0: string) => void};
+  navigation: { navigate: (arg0: string) => void };
 }) => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-   
+  const fetchData = async (page: number = 1, limit: number = 10) => {
+    try {
+      if (page === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
 
+      const response = await apiClient.get(`vehicles?page=${page}&limit=${limit}`);
+      const vehicles = response.data.vehicles;
+      const totalPages = response.data.pagination.totalPages;
+
+      if (vehicles && Array.isArray(vehicles)) {
+        if (page === 1) {
+          //@ts-ignore
+          setData(vehicles); // Initial load
+        } else {
+          //@ts-ignore
+          setData(prevData => [...prevData, ...vehicles]); // Append new data
+        }
+        setTotalPages(totalPages);
+      } else {
+        console.error('No vehicles data found');
+      }
+
+      setLoading(false);
+      setLoadingMore(false);
+    } catch (error: any) {
+      console.error('Error fetching data:', error.message || error);
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData(currentPage); // Initial fetch
+  }, []);
+
+  const loadMoreData = () => {
+    if (currentPage < totalPages && !loadingMore) {
+      const nextPage = currentPage + 1;
+      setCurrentPage(nextPage);
+      fetchData(nextPage);
+    }
+  };
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const isCloseToBottom =
+      layoutMeasurement.height + contentOffset.y >= contentSize.height - 20; // Adjust the threshold as needed
+    if (isCloseToBottom && !loadingMore) {
+      loadMoreData();
+    }
+  };
+
+  const handleEdit = async (vehicleId: string) => {
+    //@ts-ignore
+    props.navigation.navigate('Edit Vehicle', { VehicleID: vehicleId });
+  };
+
+  const handleDelete = (vehicleId: string) => {
+    Alert.alert(
+      'Confirm Deletion',
+      'Are you sure you want to delete this vehicle?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`vehicles/${vehicleId}`);
+              fetchData(currentPage); // Refresh the data after deletion
+            } catch (error: any) {
+              console.error('Error deleting vehicle:', error.message || error);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={styles.outerContainer}>
-      <ScrollView style={styles.scroll}>
-       <View style={styles.main_container}>
-        <View style={styles.vehicle_container}>
-            <View>
-          <Text style={styles.vehicle_name}>AB05DE1234</Text>
-          </View>
-            <View style={styles.iconTextContainer}>
-                <Text>Truck</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color="#000" />
+      ) : (
+        <ScrollView onScroll={handleScroll} scrollEventThrottle={16}>
+          {data.map((item: any, index: number) => (
+            <View
+              key={ index} // Ensure key is unique, fallback to index if no ID
+              style={styles.vehicle_container}>
+              <Text style={styles.vehicle_name}>
+                {item.vehicleNumber} ({item.vehicleType})
+              </Text>
+              <TouchableOpacity
+                style={styles.iconTextContainer}
+                onPress={() => handleDelete(item._id)}>
+                <Delete_icon />
+              </TouchableOpacity>
             </View>
-        </View>
-        <View style={styles.vehicle_container}>
-            <View>
-          <Text style={styles.vehicle_name}>AB05DE1234</Text>
-          </View>
-            <View style={styles.iconTextContainer}>
-                <Text>Trailer</Text>
-            </View>
-        </View>
-        <View style={styles.vehicle_container}>
-            <View>
-          <Text style={styles.vehicle_name}>AB05DE1234</Text>
-          </View>
-            <View style={styles.iconTextContainer}>
-                <Text>Truck</Text>
-            </View>
-        </View>
-        <View style={styles.vehicle_container}>
-            <View>
-          <Text style={styles.vehicle_name}>AB05DE1234</Text>
-          </View>
-            <View style={styles.iconTextContainer}>
-                <Text>Trailer</Text>
-            </View>
-        </View>
-        </View>
-        
-      </ScrollView>
+          ))}
+          {loadingMore && <ActivityIndicator size="small" color="#000" />}
+        </ScrollView>
+      )}
       <FooterBar />
     </View>
   );
@@ -81,17 +138,9 @@ export const Vehicle_Details = (props: {
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
-    backgroundColor: '#f4f4f4', // Light background color for overall app
-    // paddingBottom: 20,
-    // justifyContent:'flex-end'
+    backgroundColor: '#f4f4f4',
   },
-  scroll: {
-    marginBottom: 90,
-  },
-  main_container:{
-    marginTop:10
-  },
-  vehicle_container:{
+  vehicle_container: {
     marginHorizontal: 20,
     marginTop: 10,
     flexDirection: 'row',
@@ -102,14 +151,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  vehicle_name:{
-    fontSize:18,
-    color:'#000',
-    fontWeight:'500'
+  vehicle_name: {
+    fontSize: 18,
+    color: '#000',
+    fontWeight: '500',
   },
   iconTextContainer: {
     flexDirection: 'row',

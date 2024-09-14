@@ -6,6 +6,8 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
+  Linking,
+  Alert,
 } from 'react-native';
 import FooterBar from '../Common/footer';
 import {
@@ -19,6 +21,23 @@ import {
 export const Leaderboard_detail = (props: {
   navigation: {navigate: (arg0: string) => void};
 }) => {
+
+  const phoneNumber = '+91-1234567890'; // Static number for now
+
+
+  const makePhoneCall = (phone:string) => {
+    const url = `tel:${phone}`;
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(url);
+        } else {
+          Alert.alert('Error', 'Your device does not support this action');
+        }
+      })
+      .catch((err) => console.error('Error occurred', err));
+  };
+  
   return (
     <View style={styles.outerContainer}>
       <ScrollView style={styles.scroll}>
@@ -54,12 +73,12 @@ export const Leaderboard_detail = (props: {
         </View>
         <View style={styles.phone_section}>
           <Text style={styles.phone}>+91-1234567890</Text>
-          <TouchableOpacity style={styles.call_button}>
-            <View style={styles.iconTextContainer}>
-              <Phonecall_light />
-              <Text style={styles.call_text}> Call</Text>
-            </View>
-          </TouchableOpacity>
+          <TouchableOpacity style={styles.call_button} onPress={() => makePhoneCall(phoneNumber)}>
+        <View style={styles.iconTextContainer}>
+          <Phonecall_light />
+          <Text style={styles.call_text}> Call</Text>
+        </View>
+      </TouchableOpacity>
         </View>
         <View style={styles.comment_section}>
           <Text style={styles.comment_title}>Comments</Text>
@@ -116,10 +135,10 @@ const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
     backgroundColor: '#f4f4f4', // Light background color for overall app
-    paddingBottom: 20,
+    // paddingBottom: 20,
   },
   scroll: {
-    marginBottom: 90,
+    marginBottom: 80,
   },
   image: {
     justifyContent: 'center',
@@ -205,7 +224,7 @@ const styles = StyleSheet.create({
   },
   details_section: {
     marginHorizontal: 25,
-    marginTop: 20,
+    marginTop: 10,
     backgroundColor: '#fff',
     padding: 15,
     borderRadius: 10,
@@ -222,7 +241,7 @@ const styles = StyleSheet.create({
   },
   phone_section: {
     marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

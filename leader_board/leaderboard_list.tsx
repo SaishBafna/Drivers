@@ -169,6 +169,15 @@ export const Leaderboard_list = (props: {
                 <Text style={styles.listTitle}>User Name</Text>
                 <Verify_Tick />
               </View>
+              <View style={styles.listbody}>
+            <Text>
+              <Location_icon />
+            </Text>
+            <Text style={styles.listaddress}>
+              {' '}
+              Rani Nagar, Shivaji Chowk, Nashik, Maharashtra
+            </Text>
+          </View>
             </View>
             <TouchableOpacity style={styles.listScore} onPress={openModal1}>
         <Star_icon />
@@ -235,16 +244,8 @@ export const Leaderboard_list = (props: {
        </Modal>
       )}
           </View>
-          <View style={styles.listbody}>
-            <Text>
-              <Location_icon />
-            </Text>
-            <Text style={styles.listaddress}>
-              {' '}
-              Rani Nagar, Shivaji Chowk, Nashik, Maharashtra
-            </Text>
-          </View>
-          <View style={styles.listbody}>
+          
+          {/* <View style={styles.listbody}>
             <Text>
               <Message_icon />
             </Text>
@@ -253,16 +254,20 @@ export const Leaderboard_list = (props: {
               "I highly recommend Jonh Doe to anyone looking for a reliable and
               knowledgeable mechanic"
             </Text>
-          </View>
-          <View>
+          </View> */}
+          {/* <View>
             <Text style={styles.listdate}>15/07/2024 - 10:00 AM</Text>
-          </View>
-          <View style={styles.listfooter}>
+          </View> */}
+          {/* <View style={styles.listfooter}>
             <View style={styles.listfooter1}>
+            <View > 
               <View style={styles.icons}>
                 <View style={styles.iconWrapper}>
                   <Direction_icon />
                 </View>
+              </View>
+                             
+                <Text style={{fontSize:10, textAlign:'center'}}>Direction</Text>
               </View>
               <TouchableOpacity style={styles.icons} onPress={() => props.navigation.navigate('Leader Board Details')}>
                 <View style={styles.iconWrapper}>
@@ -277,7 +282,7 @@ export const Leaderboard_list = (props: {
                 </View>
               </View>
             </View>
-          </View>
+          </View> */}
         </View>
         <View style={styles.listContainer}>
           <View style={styles.listItem}>
@@ -422,7 +427,7 @@ const styles = StyleSheet.create({
   },
   listTitle: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 20,
     color: '#000',
     marginRight: 5, // Optional: Add space between text and icon
   },
@@ -515,14 +520,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   listbody: {
-    marginTop: 15,
+    marginTop: 5,
     flexDirection: 'row',
   },
   listaddress: {
-    fontSize: 18,
+    fontSize: 12,
     color: '#000',
     textAlign: 'left',
-    marginLeft: 20,
+    marginLeft: 5,
   },
   listdate: {
     textAlign: 'right',

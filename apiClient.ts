@@ -8,6 +8,7 @@ import {API_URL,API_IMAGE_URL} from '@env';
 // Create an Axios instance
 const apiClient = axios.create({
   baseURL: `${API_URL}`, // Base URL for the API
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json', // Default content type
   },
