@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -17,14 +17,47 @@ import {
   Star_icon,
   Verify_Tick,
 } from '../Common/icon';
+import apiClient from '../apiClient';
 
-export const Leaderboard_detail = (props: {
-  navigation: {navigate: (arg0: string) => void};
+export const Leaderboard_detail = ({
+  route,
+  navigation,
+}: {
+  route: any;
+  navigation: any;
 }) => {
 
   const phoneNumber = '+91-1234567890'; // Static number for now
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [review, setReview] = useState(false);
+  
+  const fetchData = async (page: number = 1, limit: number = 10) => {
+    const {userId} = route.params;
+    try {
+   
+        setLoading(true);
+     
 
+      const response = await apiClient.get(
+        `user/${userId}`,
+      );
+      const comment_response = await apiClient.get(
+        `reviews/${userId}`,
+      );
+      console.log(comment_response.data.reviews);
+      setData(response.data.user);
+      setReview(comment_response.data.reviews);
+    } catch (error: any) {
+      console.error('Error fetching data:', error.message || error);
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
+    fetchData(); // Initial fetch
+  }, []);
+  
   const makePhoneCall = (phone:string) => {
     const url = `tel:${phone}`;
     Linking.canOpenURL(url)
@@ -43,26 +76,26 @@ export const Leaderboard_detail = (props: {
       <ScrollView style={styles.scroll}>
         <View style={styles.image}>
           <Image
-            source={require('../Assets/Images/profile.png')}
+            source={{uri: data.avatar?.url}}
             style={styles.icon}
           />
         </View>
         <View style={styles.listItem}>
           <View style={styles.nameContainer}>
             <View style={styles.titleRow}>
-              <Text style={styles.listTitle}>User Name</Text>
+              <Text style={styles.listTitle}>{data.username}</Text>
               <Verify_Tick />
             </View>
           </View>
           <View style={styles.listScore}>
             <Star_icon />
-            <Text style={styles.listScoreText}>4.5</Text>
+            <Text style={styles.listScoreText}>{data.averageRating}</Text>
           </View>
         </View>
         <View style={styles.address_section}>
           <Location_icon1 />
           <Text style={styles.address}>
-            Rani Nagar, Shivaji Chowk, Nashik, Maharashtra
+          {data.companyAddress}
           </Text>
         </View>
         <View style={styles.details_section}>
@@ -72,8 +105,8 @@ export const Leaderboard_detail = (props: {
           </Text>
         </View>
         <View style={styles.phone_section}>
-          <Text style={styles.phone}>+91-1234567890</Text>
-          <TouchableOpacity style={styles.call_button} onPress={() => makePhoneCall(phoneNumber)}>
+          <Text style={styles.phone}>{data.phone}</Text>
+          <TouchableOpacity style={styles.call_button} onPress={() => makePhoneCall(data.phone)}>
         <View style={styles.iconTextContainer}>
           <Phonecall_light />
           <Text style={styles.call_text}> Call</Text>
@@ -82,27 +115,35 @@ export const Leaderboard_detail = (props: {
         </View>
         <View style={styles.comment_section}>
           <Text style={styles.comment_title}>Comments</Text>
-          <View style={styles.comment_card}>
-          <View style={styles.name_section}>
-            <View style={styles.img_name}>
-            <Image
-              source={require('../Assets/Images/profile.png')}
-              style={styles.profile_icon}
-            />
-            <Text style={styles.comment_author}>John Doe</Text>
-            </View>
-            <View style={styles.listScore_comment}>
-              <Star_icon />
-              <Text style={styles.listScoreText}>4.5</Text>
-            </View>
-          </View>
-          <View style={styles.comment}>
-            <Text style={styles.comment_text}>I highly recommend John deo to anyone looking for a reliable and knowledgeable mechanic.</Text>
-          </View>
-          <View>
-            <Text style={styles.comment_date}>jan 18,2024</Text>
-          </View>
-          </View>
+          {Array.isArray(review) && review.map((review: any, index: number) => {
+  console.log(review.comments); // Logging the text before returning JSX
+  
+  return (
+    <View style={styles.comment_card} key={index}>
+      <View style={styles.name_section}>
+        <View style={styles.img_name}>
+          <Image
+            source={{ uri: review.reviewerInfo.avatar?.url || 'fallback_image_url' }}
+            style={styles.profile_icon}
+          />
+          <Text style={styles.comment_author}>{review.reviewerInfo.username}</Text>
+        </View>
+        <View style={styles.listScore_comment}>
+          <Star_icon />
+          <Text style={styles.listScoreText}>{review.rating}</Text>
+        </View>
+      </View>
+      <View style={styles.comment}>
+        <Text style={styles.comment_text}>{review.comments.text}</Text>
+      </View>
+      <View>
+        <Text style={styles.comment_date}>{review.date}</Text>
+      </View>
+    </View>
+  );
+})}
+
+
           <View style={styles.comment_card}>
           <View style={styles.name_section}>
             <View style={styles.img_name}>
@@ -127,6 +168,7 @@ export const Leaderboard_detail = (props: {
         </View>
       </ScrollView>
       <FooterBar />
+      
     </View>
   );
 };

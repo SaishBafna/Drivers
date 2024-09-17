@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Image,
   StyleSheet,
@@ -26,19 +26,27 @@ import {
   Star_icon,
   Verify_Tick,
 } from '../Common/icon';
-import { BlurView } from '@react-native-community/blur';
+import {BlurView} from '@react-native-community/blur';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Import MaterialCommunityIcons
+import apiClient from '../apiClient';
 
-
-export const Leaderboard_list = (props: {
-  navigation: {navigate: (arg0: string) => void};
+export const Leaderboard_list = ({
+  route,
+  navigation,
+}: {
+  route: any;
+  navigation: any;
 }) => {
-
   const [modalVisible, setModalVisible] = useState(false);
   const [activeOptions, setActiveOptions] = useState([]);
   const [modalVisible1, setModalVisible1] = useState(false);
   const [rating, setRating] = useState(0); // Rating value (1-5)
   const [comment, setComment] = useState(''); // Comment text
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const openModal1 = () => {
     setModalVisible1(true);
@@ -63,11 +71,54 @@ export const Leaderboard_list = (props: {
     setModalVisible(false);
   };
 
+  const fetchData = async (page: number = 1, limit: number = 10) => {
+    const serviceType = route.params;
+    try {
+      if (page === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const response = await apiClient.get(
+        `users?serviceType=Tower&page=${page}&limit=${limit}`,
+      );
+      const leaders = response.data.users;
+      // const totalPages = response.data.pagination.totalPages;
+      console.log(leaders.avatar);
+      if (leaders && Array.isArray(leaders)) {
+        // console.log(leaders.avatar); // Use optional chaining in case avatar is not defined
+
+        if (page === 1) {
+          //@ts-ignore
+          setData(leaders); // Initial load
+        } else {
+          //@ts-ignore
+          setData(prevData => [...prevData, ...leaders]); // Append new data
+        }
+        setTotalPages(1);
+      } else {
+        // console.error('No vehicles data found');
+      }
+
+      setLoading(false);
+      setLoadingMore(false);
+    } catch (error: any) {
+      console.error('Error fetching data:', error.message || error);
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData(currentPage); // Initial fetch
+  }, []);
+
   const toggleOption = (option: string) => {
-    setActiveOptions((prev) =>
+    setActiveOptions(prev =>
       prev.includes(option)
-        ? prev.filter((item) => item !== option)
-        : [...prev, option]
+        ? prev.filter(item => item !== option)
+        : [...prev, option],
     );
   };
 
@@ -79,272 +130,135 @@ export const Leaderboard_list = (props: {
 
   return (
     <View style={styles.outerContainer}>
-        <View style={styles.container}>
-      <MaterialSymbolsSearch />
-      <TextInput
-        style={styles.input}
-        placeholder="Search..."
-        placeholderTextColor="#999"
-      />
-      <TouchableOpacity style={styles.filterButton} onPress={openFilterModal}>
-        <Filter_icon />
-        <Text style={styles.filterText}>Filter</Text>
-      </TouchableOpacity>
+      <View style={styles.container}>
+        <MaterialSymbolsSearch />
+        <TextInput
+          style={styles.input}
+          placeholder="Search..."
+          placeholderTextColor="#999"
+        />
+        <TouchableOpacity style={styles.filterButton} onPress={openFilterModal}>
+          <Filter_icon />
+          <Text style={styles.filterText}>Filter</Text>
+        </TouchableOpacity>
 
-      <Modal
-        transparent={true}
-        visible={modalVisible}
-        animationType="slide"
-        onRequestClose={closeFilterModal}
-      >
-        <TouchableWithoutFeedback onPress={closeFilterModal}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalHeader}>Filter by...</Text>
-                <View style={styles.hrLine} />
-                <View style={styles.filterOption}>
-                  <Text style={styles.optionTitle}>Nearby Towns and Cities:</Text>
-                  <View style={styles.optionContainer}>
-                    {['Daly City, California', 'Brisbane, California', 'Sausalito, California'].map((option) => (
-                      <TouchableOpacity
-                        key={option}
-                        style={[
-                          styles.optionValue,
-                          isActive(option) && styles.activeOption,
-                        ]}
-                        onPress={() => toggleOption(option)}
-                      >
-                        <Text
+        <Modal
+          transparent={true}
+          visible={modalVisible}
+          animationType="slide"
+          onRequestClose={closeFilterModal}>
+          <TouchableWithoutFeedback onPress={closeFilterModal}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalHeader}>Filter by...</Text>
+                  <View style={styles.hrLine} />
+                  <View style={styles.filterOption}>
+                    <Text style={styles.optionTitle}>
+                      Nearby Towns and Cities:
+                    </Text>
+                    <View style={styles.optionContainer}>
+                      {[
+                        'Daly City, California',
+                        'Brisbane, California',
+                        'Sausalito, California',
+                      ].map(option => (
+                        <TouchableOpacity
+                          key={option}
                           style={[
-                            styles.optionText,
-                            isActive(option) && styles.activeOptionText,
+                            styles.optionValue,
+                            isActive(option) && styles.activeOption,
                           ]}
-                        >
-                          {option}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                          onPress={() => toggleOption(option)}>
+                          <Text
+                            style={[
+                              styles.optionText,
+                              isActive(option) && styles.activeOptionText,
+                            ]}>
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <View style={styles.filterOption}>
+                    <Text style={styles.optionTitle}>Rating:</Text>
+                    <View style={styles.optionContainer}>
+                      {['Low', 'Medium', 'High'].map(option => (
+                        <TouchableOpacity
+                          key={option}
+                          style={[
+                            styles.optionValue,
+                            isActive(option) && styles.activeOption,
+                          ]}
+                          onPress={() => toggleOption(option)}>
+                          <Text
+                            style={[
+                              styles.optionText,
+                              isActive(option) && styles.activeOptionText,
+                            ]}>
+                            {option}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
                 </View>
-                <View style={styles.filterOption}>
-                  <Text style={styles.optionTitle}>Rating:</Text>
-                  <View style={styles.optionContainer}>
-                    {['Low', 'Medium', 'High'].map((option) => (
-                      <TouchableOpacity
-                        key={option}
-                        style={[
-                          styles.optionValue,
-                          isActive(option) && styles.activeOption,
-                        ]}
-                        onPress={() => toggleOption(option)}
-                      >
-                        <Text
-                          style={[
-                            styles.optionText,
-                            isActive(option) && styles.activeOptionText,
-                          ]}
-                        >
-                          {option}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      </View>
       <ScrollView style={styles.scroll}>
-        <View style={styles.listContainer}>
-          <View style={styles.listItem}>
-            <Image
-              source={require('../Assets/Images/profile.png')}
-              style={styles.icon}
-            />
-            <View style={styles.nameContainer}>
-              <View style={styles.titleRow}>
-                <Text style={styles.listTitle}>User Name</Text>
-                <Verify_Tick />
+        {data.map((item: any, index: number) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.listContainer}
+            onPress={() =>
+              navigation.navigate('Leader Board Details', {userId: item._id})
+            }>
+            <View style={styles.listItem}>
+              <Image source={{uri: item.avatar?.url}} style={styles.icon} />
+              <View style={styles.nameContainer}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.listTitle}>{item.username}</Text>
+                  <Verify_Tick />
+                </View>
+                <View style={styles.listbody}>
+                  <Text>
+                    <Location_icon />
+                  </Text>
+                  <Text style={styles.listaddress}> {item.companyAddress}</Text>
+                </View>
+                <View style={styles.listfooter}>
+                  <View style={{marginRight: 10}}>
+                    <Text style={{fontSize: 10}}>Direction</Text>
+
+                    <View style={styles.iconWrapper}>
+                      <Direction_icon />
+                    </View>
+                  </View>
+                  <TouchableOpacity style={{marginRight: 10}}>
+                    <Text style={{fontSize: 10}}>Details</Text>
+                    <View style={styles.iconWrapper}>
+                      <Information_icon />
+                    </View>
+                  </TouchableOpacity>
+                  <View style={{marginRight: 10}}>
+                    <Text style={{fontSize: 10}}>Contact</Text>
+                    <View style={styles.iconWrapper}>
+                      <Phonecall_icon />
+                    </View>
+                  </View>
+                </View>
               </View>
-              <View style={styles.listbody}>
-            <Text>
-              <Location_icon />
-            </Text>
-            <Text style={styles.listaddress}>
-              {' '}
-              Rani Nagar, Shivaji Chowk, Nashik, Maharashtra
-            </Text>
-          </View>
             </View>
             <TouchableOpacity style={styles.listScore} onPress={openModal1}>
-        <Star_icon />
-        <Text style={styles.listScoreText}>4.5</Text>
-      </TouchableOpacity>
-
-      {modalVisible1 && (
-         <Modal
-         transparent={true}
-         visible={modalVisible1}
-         animationType="slide"
-         onRequestClose={closeModal}
-       >
-         <View style={styles.ratingModalOverlay}>
-           <TouchableWithoutFeedback onPress={closeModal}>
-             <View style={styles.ratingModalOverlayTouchable} />
-           </TouchableWithoutFeedback>
-           <View style={styles.ratingModalContent}>
-             {/* Close Button */}
-             <TouchableOpacity style={styles.ratingCloseButton} onPress={closeModal}>
-             <Icon name="close" size={24} color="#000" />
-             </TouchableOpacity>
-             
-             {/* Rating Heading */}
-             <Text style={styles.ratingModalHeader}>Rating</Text>
-             
-             {/* 5 Stars Rating */}
-             <View style={styles.ratingStarContainer}>
-               {Array.from({ length: 5 }, (_, index) => {
-                 const starNumber = index + 1;
-                 return (
-                   <TouchableOpacity
-                     key={starNumber}
-                     onPress={() => setRating(starNumber)}
-                   >
-                      <Icon
-                      name={starNumber <= rating ? 'star' : 'star-outline'} // Filled star or outline based on rating
-                      size={30}
-                      color="#FFD700" // Yellow color for selected stars
-                      style={styles.ratingStar}
-                    />
-                   </TouchableOpacity>
-                 );
-               })}
-             </View>
-             
-             {/* Comment Section */}
-             <Text style={styles.ratingCommentLabel}>Comment:</Text>
-             <TextInput
-               style={styles.ratingTextArea}
-               multiline={true}
-               numberOfLines={4}
-               placeholder="Write your comment here..."
-               value={comment}
-               onChangeText={setComment}
-             />
-             
-             {/* Submit Button */}
-             <TouchableOpacity style={styles.ratingSubmitButton} onPress={submitRating}>
-               <Text style={styles.ratingSubmitButtonText}>Submit</Text>
-             </TouchableOpacity>
-           </View>
-         </View>
-       </Modal>
-      )}
-          </View>
-          
-          {/* <View style={styles.listbody}>
-            <Text>
-              <Message_icon />
-            </Text>
-            <Text style={styles.listaddress}>
-              {' '}
-              "I highly recommend Jonh Doe to anyone looking for a reliable and
-              knowledgeable mechanic"
-            </Text>
-          </View> */}
-          {/* <View>
-            <Text style={styles.listdate}>15/07/2024 - 10:00 AM</Text>
-          </View> */}
-          {/* <View style={styles.listfooter}>
-            <View style={styles.listfooter1}>
-            <View > 
-              <View style={styles.icons}>
-                <View style={styles.iconWrapper}>
-                  <Direction_icon />
-                </View>
-              </View>
-                             
-                <Text style={{fontSize:10, textAlign:'center'}}>Direction</Text>
-              </View>
-              <TouchableOpacity style={styles.icons} onPress={() => props.navigation.navigate('Leader Board Details')}>
-                <View style={styles.iconWrapper}>
-                  <Information_icon />
-                </View>
-              </TouchableOpacity>
-            </View>
-            <View>
-              <View style={styles.icons}>
-                <View style={styles.iconWrapper}>
-                  <Phonecall_icon />
-                </View>
-              </View>
-            </View>
-          </View> */}
-        </View>
-        <View style={styles.listContainer}>
-          <View style={styles.listItem}>
-            <Image
-              source={require('../Assets/Images/profile.png')}
-              style={styles.icon}
-            />
-            <View style={styles.nameContainer}>
-              <View style={styles.titleRow}>
-                <Text style={styles.listTitle}>User Name</Text>
-                <Verify_Tick />
-              </View>
-            </View>
-            <View style={styles.listScore}>
               <Star_icon />
-              <Text style={styles.listScoreText}>4.5</Text>
-            </View>
-          </View>
-          <View style={styles.listbody}>
-            <Text>
-              <Location_icon />
-            </Text>
-            <Text style={styles.listaddress}>
-              {' '}
-              Rani Nagar, Shivaji Chowk, Nashik, Maharashtra
-            </Text>
-          </View>
-          <View style={styles.listbody}>
-            <Text>
-              <Message_icon />
-            </Text>
-            <Text style={styles.listaddress}>
-              {' '}
-              "I highly recommend Jonh Doe to anyone looking for a reliable and
-              knowledgeable mechanic"
-            </Text>
-          </View>
-          <View>
-            <Text style={styles.listdate}>15/07/2024 - 10:00 AM</Text>
-          </View>
-          <View style={styles.listfooter}>
-            <View style={styles.listfooter1}>
-              <View style={styles.icons}>
-                <View style={styles.iconWrapper}>
-                  <Direction_icon />
-                </View>
-              </View>
-              <TouchableOpacity style={styles.icons}>
-                <View style={styles.iconWrapper}>
-                  <Information_icon />
-                </View>
-              </TouchableOpacity>
-            </View>
-            <View>
-              <View style={styles.icons}>
-                <View style={styles.iconWrapper}>
-                  <Phonecall_icon />
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
+              <Text style={styles.listScoreText}>{item.averageRating}</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
       <FooterBar />
     </View>
@@ -371,9 +285,9 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginRight: 5,
-    width: 55,
-    height: 55,
-    borderRadius: 50,
+    width: 110,
+    height: 115,
+    borderRadius: 10,
   },
   input: {
     flex: 1,
@@ -397,8 +311,8 @@ const styles = StyleSheet.create({
   listContainer: {
     marginTop: 10,
     marginHorizontal: 15,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     backgroundColor: '#fff', // White background for list container
     borderRadius: 10,
     marginBottom: 10,
@@ -417,9 +331,9 @@ const styles = StyleSheet.create({
   },
   nameContainer: {
     flex: 1,
-    justifyContent: 'center',
+    // justifyContent: 'center',
     alignItems: 'flex-start',
-    marginLeft: 10,
+    marginLeft: 5,
   },
   titleRow: {
     flexDirection: 'row', // Align items in a row
@@ -437,8 +351,8 @@ const styles = StyleSheet.create({
   },
   listScore: {
     position: 'absolute',
-    right: -4,
-    top: 2,
+    right: 5,
+    bottom: 10,
     backgroundColor: '#fffcc2',
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -484,7 +398,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    marginTop:40
+    marginTop: 40,
     // textAlign: 'center',
   },
   ratingStarContainer: {
@@ -527,7 +441,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#000',
     textAlign: 'left',
-    marginLeft: 5,
+    // marginLeft: 2,
   },
   listdate: {
     textAlign: 'right',
@@ -536,9 +450,9 @@ const styles = StyleSheet.create({
   listfooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginLeft: 30,
-    marginRight: 30,
-    marginTop: 20,
+    // marginLeft: 30,
+    // marginRight: 30,
+    marginTop: 10,
   },
   listfooter1: {
     flexDirection: 'row',
@@ -614,5 +528,9 @@ const styles = StyleSheet.create({
   },
   activeOptionText: {
     color: '#FFF', // White text color for active option
+  },
+  rightfooter: {
+    justifyContent: 'flex-end',
+    marginLeft: 30,
   },
 });

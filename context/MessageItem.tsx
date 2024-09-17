@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 //@ts-ignore
-const MessageItem = ({ message, onDelete }) => {
-  const [userId, setUserId] = useState(null);
+const MessageItem = ({ message, previousMessage }) => {
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // ScrollView ref with proper typing
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -15,9 +18,16 @@ const MessageItem = ({ message, onDelete }) => {
     fetchUserId();
   }, []);
 
+  useEffect(() => {
+    // Scroll to the bottom when new messages are rendered
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  }, [message]); // Rerun effect when a new message is passed
+
   if (!message) return null; // Handle case when message is not passed
 
-  // Extract and format the date
+  // Extract and format the date of the current message
   const messageDate = new Date(message.createdAt).toLocaleDateString('en-US', {
     day: 'numeric',
     month: 'long',
@@ -30,11 +40,28 @@ const MessageItem = ({ message, onDelete }) => {
     hour12: true,
   });
 
+  // Extract and format the date of the previous message (if it exists)
+  const previousMessageDate = previousMessage
+    ? new Date(previousMessage.createdAt).toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
+
+  // Check if the date is the same as the previous message's date
+  const showDate = previousMessageDate !== messageDate;
+
   return (
-    <View style={styles.container}>
-      <View style={{ alignItems: 'center', marginVertical: 5 }}>
-        <Text>{messageDate}</Text>
-      </View>
+    <ScrollView
+    ref={scrollViewRef}
+    contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' ,marginBottom:10}}
+    >
+      {showDate && (
+        <View style={{ alignItems: 'center', marginVertical: 5 }}>
+          <Text>{messageDate}</Text>
+        </View>
+      )}
       <View>
         <View
           style={
@@ -68,7 +95,7 @@ const MessageItem = ({ message, onDelete }) => {
           {messageTime}
         </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 

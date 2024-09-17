@@ -26,6 +26,7 @@ import {
 import {requestHandler} from '../utils';
 import {Addfile_icon, Circle_Phone_icon, Send_icon} from '../Common/icon';
 import DocumentPicker from 'react-native-document-picker';
+import MessagesList from '../context/MessageItem';
 
 const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
   const CONNECTED_EVENT = 'connect';
@@ -54,6 +55,7 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
   const [selfTyping, setSelfTyping] = useState(false);
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Initialize socket
   const initializeSocket = async () => {
@@ -110,7 +112,7 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
 
   const sendChatMessage = async () => {
     if (!message.trim() || !currentChat?._id || !socket?.id) return;
-  
+
     socket.emit(STOP_TYPING_EVENT, currentChat._id);
     requestHandler(
       async () => await sendMessage(currentChat._id, message, attachedFiles),
@@ -121,10 +123,9 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
         // setMessages(prev => [res.data, ...prev]);
         updateChatLastMessage(currentChat._id, res.data);
       },
-      Alert.alert
+      Alert.alert,
     );
   };
-  
 
   const onConnect = () => {
     setIsConnected(true);
@@ -169,40 +170,39 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
 
   const handleOnMessageChange = (text: string) => {
     setMessage(text);
-  
+
     if (!socket || !isConnected || !currentChat?._id) return;
-  
+
     if (!selfTyping) {
       setSelfTyping(true);
       socket.emit(TYPING_EVENT, currentChat._id); // Don't call the handler directly here
     }
-  
+
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-  
+
     typingTimeoutRef.current = setTimeout(() => {
       socket.emit(STOP_TYPING_EVENT, currentChat._id);
       setSelfTyping(false);
     }, 3000);
   };
-  
+
   const onMessageReceived = (message: ChatMessageInterface) => {
     if (!message?.chat || !currentChat?._id) return;
-  
+
     if (message.chat !== currentChat._id) {
       setUnreadMessages(prevMessages =>
         prevMessages.some(msg => msg._id === message._id)
           ? prevMessages
-          : [...prevMessages, message]
+          : [...prevMessages, message],
       );
     } else {
       setMessages(prevMessages =>
         prevMessages.some(msg => msg._id === message._id)
           ? prevMessages
-          : [...prevMessages, message]
+          : [...prevMessages, message],
       );
     }
   };
-  
 
   const onMessageDelete = (message: ChatMessageInterface) => {
     setMessages(prev => prev.filter(msg => msg._id !== message._id));
@@ -270,6 +270,13 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
   }, [route.params, socket]);
 
   useEffect(() => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  }, [messages, isTyping]);
+  
+
+  useEffect(() => {
     // Set up event listeners
     if (!socket) return;
 
@@ -302,15 +309,15 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
       {currentChat ? (
         <View style={styles.container}>
           <ScrollView
+            ref={scrollViewRef}
             style={styles.message_container}
             contentContainerStyle={{flexGrow: 1, justifyContent: 'flex-end'}}>
             {messages.map((msg, index) => (
-  <MessageItem
-    key={index}
-    message={msg}
-    onDelete={deleteMessage}
-  />
-))}
+              <MessagesList key={index} message={msg} previousMessage={messages[index - 1] || null} onDelete={deleteMessage} />
+            ))}
+            {isTyping && (
+            <Text style={styles.typingText}>Typing...</Text>
+          )}
           </ScrollView>
           <View style={styles.inputContainer}>
             <TouchableOpacity style={styles.phone_call} onPress={initiateCall}>
@@ -365,6 +372,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 5,
     padding: 8,
+  },
+  typingText:{
+    fontSize:15,
+    alignSelf: 'flex-start',
+    backgroundColor: '#fff',
+    padding: 10,
+    color: '#000',
+    borderRadius: 10,
+    margin: 5,
+    maxWidth: '80%',
   },
 });
 
