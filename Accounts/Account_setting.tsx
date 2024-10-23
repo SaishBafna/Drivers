@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import {Pointer_icon, Rightarrow} from '../Common/icon';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiClient from '../apiClient';
 
 const Setting_Account = (props: { navigation: { navigate: (arg0: string) => void; }; }) => {
+
+  
   return (
     <View style={styles.container}>
       <View>

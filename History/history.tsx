@@ -1,99 +1,161 @@
-import React, {useEffect, useState} from 'react';
-import {Image, StyleSheet, Text, View, TouchableOpacity, Alert} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import apiClient from '../apiClient';
-import WaveLoader, {Phonecall, Phonecall_white} from '../Common/icon';
+import WaveLoader, { Phonecall, Phonecall_white } from '../Common/icon';
 import FooterBar from '../Common/footer';
-// import {useSocket} from '../context/socket';
-import {LocalStorage} from '../utils';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import socketio from 'socket.io-client';
-//@ts-ignore
-import {SOCKET_URI} from '@env';
+import { SOCKET_URI } from '@env';
+import LoaderKit from 'react-native-loader-kit';
+import ringtonePath from '../Assets/Sounds/rington.mp3';
+import callerTunePath from '../Assets/Sounds/caller.mp3';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Sound from 'react-native-sound';
 
-export const History = ({navigation}: {navigation: any}) => {
+export const History = ({ navigation }) => {
   const [data, setData] = useState([]);
+  const [socket, setSocket] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [socket, setSocket] = useState<ReturnType<typeof socketio> | null>(
-    null,
-  );
-  // const initializeSocket = async () => {
-  //   try {
-  //     const token = await AsyncStorage.getItem('authToken');
-  //     if (!token) {
-  //       console.warn('No authToken found in AsyncStorage');
-  //       return;
-  //     }
 
-  //     const socketInstance = socketio(`${SOCKET_URI}`, {
-  //       withCredentials: true,
-  //       auth: {token},
-        
-  //     });
+  useEffect(() => {
+    const initializeSocket = async () => {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+        if (!token) {
+          console.warn('No authToken found in AsyncStorage');
+          return;
+        }
 
-  //     // Set up socket event listeners
-  //     socketInstance.on('connect', () => {
-  //       console.log('Socket connected:', socketInstance.id);
-  //     });
+        const socketInstance = socketio(SOCKET_URI, {
+          transports: ['websocket'],
+          withCredentials: true,
+          auth: { token },
+        });
 
-  //     socketInstance.on('connect_error', error => {
-  //       console.error('Socket connection error:', error);
-  //       Alert.alert('Error', 'Failed to connect to the server.');
-  //     });
+        socketInstance.on('connect', () => {
+          console.log('Socket connected:', socketInstance.id);
+        });
 
-  //     socketInstance.on('disconnect', () => {
-  //       console.log('Socket disconnected');
-  //     });
+        socketInstance.on('connect_error', error => {
+          console.error('Socket connection error:', error);
+          Alert.alert('Error', 'Failed to connect to the server.');
+        });
 
-  //     setSocket(socketInstance);
-  //   } catch (error) {
-  //     console.error('Error initializing socket:', error);
-  //     Alert.alert('Error', 'Failed to initialize socket connection.');
-  //   }
-  // };
+        socketInstance.on('disconnect', () => {
+          console.log('Socket disconnected');
+        });
 
-  // useEffect(() => {
-  //   initializeSocket();
+        setSocket(socketInstance);
+      } catch (error) {
+        console.error('Error initializing socket:', error);
+        Alert.alert('Error', 'Failed to initialize socket connection.');
+      }
+    };
 
-  //   return () => {
-  //     if (socket) {
-  //       console.log('Cleaning up socket connection...');
-  //       socket.disconnect();
-  //     }
-  //   };
-  // }, []);
+    initializeSocket();
+
+    return () => {
+      if (socket) {
+        console.log('Cleaning up socket connection...');
+        socket.disconnect();
+      }
+    };
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const response = await apiClient.get('chats/');
       setData(response.data.data);
-      // const token = await AsyncStorage.getItem('authToken');
-      // console.log(token);
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
       setLoading(false);
     }
   };
-  console.log(data);
-  const createOrOpenChat = async (id: string, name: string) => {
+  const createOrOpenChat = async (id, name, profile) => {
     try {
       const response = await apiClient.post(`chats/c/${id}`);
-      const chat = response.data.chat;
-      console.log(chat)
-      // Store chat info and navigate to chat room with the friend's name
-      LocalStorage.set('currentChat', chat);
-      navigation.navigate('Chat', { chatId: chat._id, friendName: name });
-  
-      // Notify server about the new chat
-      // if (socket) {
-      //   socket.emit('joinChat', chat._id);
-      // }
+      const chat = response.data.data;
+      // LocalStorage.set('currentChat', chat);
+      navigation.navigate('Chat', {
+        chatId: chat._id,
+        friendName: name,
+        AgentID: id,
+        ProfileImage: profile,
+      });
     } catch (error) {
       console.error('Error creating or opening chat:', error);
     }
   };
+
+  const initiateCall = async (id, username, url) => {
+    if (!socket) {
+      console.error('Socket is not initialized');
+      return;
+    }
+
+    // Check receiver's online status before initiating the call
+    socket.emit('checkStatus', { receiverId: id });
+
+    socket.on('statusResponse', ({ online }) => {
+      if (online) {
+        // Notify the server to initiate the call
+        socket.emit('call', { callerId: id, receiverId: username });
+        playCallerTune();
+        
+        // Handle incoming call event
+        socket.on('incomingCall', ({ callerId }) => {
+          playRingtone();
+          showIncomingCallUI(callerId, url);
+        });
+      } else {
+        Alert.alert('User is not online');
+      }
+    });
+  };
+  const playTune = (tuneRef, fileName) => {
+    if (tuneRef.current) {
+      tuneRef.current.stop();
+      tuneRef.current.release();
+    }
+    tuneRef.current = new Sound(fileName, Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.error('Failed to load the sound', error);
+        return;
+      }
+      tuneRef.current.play((success: any) => {
+        if (!success) {
+          console.error('Playback failed due to audio decoding errors');
+        }
+      });
+    });
+  };
   
+
+  const playCallerTune = () => {
+    playTune(callerTune, callerTunePath);
+  };
+  
+  const playRingtone = () => {
+    playTune(ringtone, ringtonePath);
+  };
+
+  const showIncomingCallUI = (callerId, url) => {
+    // Navigate to the calling screen or show incoming call UI
+    navigation.navigate('CallingScreen', {
+      mode: 'receiver',
+      caller: { id: callerId },
+      receiver: { id: url },
+    });
+  };
 
   useEffect(() => {
     fetchData();

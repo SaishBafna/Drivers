@@ -1,7 +1,7 @@
 import {Picker} from '@react-native-picker/picker';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Alert,
   Button,
@@ -59,13 +59,20 @@ import {Add_vehicle} from './Vehicle/add_vehicle';
 import WebRTCComponent from './call';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Update_vehicle} from './Vehicle/update_vehicle';
+import { requestUserPermission } from './notification/notification';
+import { Subscription } from './Subscription/subscription';
+import { StripeProvider } from '@stripe/stripe-react-native';
+import { Success } from './Subscription/success';
+import OngoingCallScreen from './Talk_to_friend/ongoing_call';
 
 enableScreens();
 
 const Stack = createNativeStackNavigator();
 
+
 function App(): React.JSX.Element {
   return (
+    <StripeProvider publishableKey="pk_test_51PYX6oRvFb9ZGon6ajhezWFAQ3tOI1PliJK8RgD7YjAfUkA9iSmjW4BobKn7LSePzk78JjLM832LnZTXnIRxyA6D00jVrr6eQX">
     <NavigationContainer>
       <Stack.Navigator>
         <Stack.Screen
@@ -184,11 +191,19 @@ function App(): React.JSX.Element {
                   <Back_icon />
                 </TouchableOpacity>
                 <View style={styles.imgContainer}>
-                  <Image
-                    source={require('./Assets/Images/profile.png')}
-                    style={styles.profileImage}
-                    resizeMode="cover"
-                  />
+                  {route.params?.ProfileImage ? (
+                      <Image
+                        source={{uri: route.params?.ProfileImage}}
+                        style={styles.profileImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Image
+                        source={require('./Assets/Images/profile.png')}
+                        style={styles.profileImage}
+                        resizeMode="cover"
+                      />
+                    )}
                 </View>
                 <Text style={styles.friendName}>
                   {route.params?.friendName || 'Friend'}
@@ -413,6 +428,14 @@ function App(): React.JSX.Element {
             headerTitle: '',
           }}
         />
+         <Stack.Screen
+          name="ongoing_call"
+          component={OngoingCallScreen}
+          options={{
+            headerTransparent: true,
+            headerTitle: '',
+          }}
+        />
         <Stack.Screen
           name="Mechanic_Profile"
           component={Mechanic_Profile}
@@ -454,7 +477,22 @@ function App(): React.JSX.Element {
             headerTitle: 'Edit Vehicle',
           }}
         />
-
+        <Stack.Screen 
+          name='subscription'
+          component={Subscription}
+          options={{
+            headerTransparent: false,
+            headerTitle:'Subscription',
+          }}
+        />
+         <Stack.Screen 
+          name='Success'
+          component={Success}
+          options={{
+            headerTransparent: false,
+            headerTitle:'Payment Success',
+          }}
+        />
         <Stack.Screen
           name="Vehicle_Details"
           component={Vehicle_Details}
@@ -477,6 +515,7 @@ function App(): React.JSX.Element {
         />
       </Stack.Navigator>
     </NavigationContainer>
+    </StripeProvider>
   );
 }
 
@@ -491,7 +530,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     overflow: 'hidden',
     justifyContent: 'flex-start',
-    backgroundColor: 'black',
+    backgroundColor: 'white',
     marginLeft: 8,
   },
   profileImage: {

@@ -31,7 +31,7 @@ export const Registration = (props: { navigation: { navigate: (arg0: string) => 
     }
 
     // const apiBaseUrl = process.env.APP_BASE_URL; 
-
+    // console.log(API_URL,API_IMAGE_URL);
     const payload = {
       username: name,
       email: email,
@@ -44,7 +44,7 @@ export const Registration = (props: { navigation: { navigate: (arg0: string) => 
 
     try {
      
-      const response = await axios.post(`${API_URL}register`, payload);
+      const response = await axios.post(`https://drivers-server-7gl0.onrender.com/api/v1/auth/register`, payload);
 
       if (response.status === 201) {
         Alert.alert('Success', 'Registration successful');
@@ -122,7 +122,7 @@ export const Registration = (props: { navigation: { navigate: (arg0: string) => 
 
       <CustomButton
         title={'Register'}
-        onPress={register} icon={undefined}      />
+        onPress={register} icon={undefined} disabled={undefined}      />
 
       <View style={styles.dividerContainer}>
         <View style={styles.line} />

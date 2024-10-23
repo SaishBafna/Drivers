@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -9,25 +9,18 @@ import {
   ScrollView,
   TouchableWithoutFeedback,
   Modal,
-  Easing,
-  Animated,
-  GestureResponderEvent,
 } from 'react-native';
 import FooterBar from '../Common/footer';
-import CustomButton from '../Common/custombutton ';
 import {
   Direction_icon,
   Filter_icon,
   Information_icon,
   Location_icon,
   MaterialSymbolsSearch,
-  Message_icon,
   Phonecall_icon,
   Star_icon,
   Verify_Tick,
 } from '../Common/icon';
-import {BlurView} from '@react-native-community/blur';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Import MaterialCommunityIcons
 import apiClient from '../apiClient';
 
 export const Leaderboard_list = ({
@@ -38,30 +31,20 @@ export const Leaderboard_list = ({
   navigation: any;
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
-  const [activeOptions, setActiveOptions] = useState([]);
-  const [modalVisible1, setModalVisible1] = useState(false);
-  const [rating, setRating] = useState(0); // Rating value (1-5)
-  const [comment, setComment] = useState(''); // Comment text
+  const [activeOptions, setActiveOptions] = useState<string[]>([]);
+  const [activeRating, setActiveRating] = useState<string>('');
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const openModal1 = () => {
-    setModalVisible1(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible1(false);
-  };
-
-  const submitRating = () => {
-    // Submit the rating and comment to the backend here
-    console.log('Rating:', rating);
-    console.log('Comment:', comment);
-    closeModal(); // Close modal after submission
-  };
+  const cities = [
+    'Daly City, California',
+    'Brisbane, California',
+    'Sausalito, California',
+  ];
+  const ratings = ['low', 'medium', 'high'];
 
   const openFilterModal = () => {
     setModalVisible(true);
@@ -72,61 +55,63 @@ export const Leaderboard_list = ({
   };
 
   const fetchData = async (page: number = 1, limit: number = 10) => {
-    const serviceType = route.params;
+    const { serviceType } = route.params;
     try {
-      if (page === 1) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
+      setLoading(true);
+
+      // let endpoint = `users?serviceType=${serviceType}&page=${page}&limit=${limit}`;
+      let endpoint = `users?serviceType=Mechanic&page=${page}&limit=${limit}`;
+
+      // Add filter parameters
+      if (activeOptions.length > 0) {
+        endpoint += `&Address=${activeOptions.join(',')}`;
+      }
+      if (activeRating) {
+        endpoint += `&rating=${activeRating}`;
+      }
+      if (searchQuery) {
+        endpoint += `&search=${searchQuery}`;
       }
 
-      const response = await apiClient.get(
-        `users?serviceType=Tower&page=${page}&limit=${limit}`,
-      );
+      const response = await apiClient.get(endpoint);
       const leaders = response.data.users;
-      // const totalPages = response.data.pagination.totalPages;
-      console.log(leaders.avatar);
+      console.log(response.data);
       if (leaders && Array.isArray(leaders)) {
-        // console.log(leaders.avatar); // Use optional chaining in case avatar is not defined
-
-        if (page === 1) {
-          //@ts-ignore
-          setData(leaders); // Initial load
-        } else {
-          //@ts-ignore
-          setData(prevData => [...prevData, ...leaders]); // Append new data
-        }
-        setTotalPages(1);
-      } else {
-        // console.error('No vehicles data found');
+        setData(page === 1 ? leaders : (prevData) => [...prevData, ...leaders]);
+        setTotalPages(response.data.totalPages || 1);
       }
 
       setLoading(false);
-      setLoadingMore(false);
     } catch (error: any) {
       console.error('Error fetching data:', error.message || error);
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchData(currentPage); // Initial fetch
-  }, []);
+    fetchData(currentPage);
+  }, [activeOptions, activeRating, searchQuery]);
 
   const toggleOption = (option: string) => {
-    setActiveOptions(prev =>
+    setActiveOptions((prev) =>
       prev.includes(option)
-        ? prev.filter(item => item !== option)
-        : [...prev, option],
+        ? prev.filter((item) => item !== option)
+        : [...prev, option]
     );
   };
 
-  const isActive = (option: string) => activeOptions.includes(option);
+  const toggleRating = (rating: string) => {
+    setActiveRating((prev) => (prev === rating ? '' : rating));
+  };
 
-  function openModal(event: GestureResponderEvent): void {
-    throw new Error('Function not implemented.');
-  }
+  const isActive = (option: string) => activeOptions.includes(option);
+  const isActiveRating = (rating: string) => activeRating === rating;
+
+  const applyFilters = () => {
+    setCurrentPage(1);
+    fetchData(1);
+    closeFilterModal();
+  };
 
   return (
     <View style={styles.outerContainer}>
@@ -136,6 +121,9 @@ export const Leaderboard_list = ({
           style={styles.input}
           placeholder="Search..."
           placeholderTextColor="#999"
+          value={searchQuery}
+          onChangeText={(text) => setSearchQuery(text)}
+          onSubmitEditing={() => fetchData(1)}
         />
         <TouchableOpacity style={styles.filterButton} onPress={openFilterModal}>
           <Filter_icon />
@@ -153,16 +141,12 @@ export const Leaderboard_list = ({
                 <View style={styles.modalContent}>
                   <Text style={styles.modalHeader}>Filter by...</Text>
                   <View style={styles.hrLine} />
-                  <View style={styles.filterOption}>
+                  {/* <View style={styles.filterOption}>
                     <Text style={styles.optionTitle}>
                       Nearby Towns and Cities:
                     </Text>
                     <View style={styles.optionContainer}>
-                      {[
-                        'Daly City, California',
-                        'Brisbane, California',
-                        'Sausalito, California',
-                      ].map(option => (
+                      {cities.map((option) => (
                         <TouchableOpacity
                           key={option}
                           style={[
@@ -180,22 +164,22 @@ export const Leaderboard_list = ({
                         </TouchableOpacity>
                       ))}
                     </View>
-                  </View>
+                  </View> */}
                   <View style={styles.filterOption}>
                     <Text style={styles.optionTitle}>Rating:</Text>
                     <View style={styles.optionContainer}>
-                      {['Low', 'Medium', 'High'].map(option => (
+                      {ratings.map((option) => (
                         <TouchableOpacity
                           key={option}
                           style={[
                             styles.optionValue,
-                            isActive(option) && styles.activeOption,
+                            isActiveRating(option) && styles.activeOption,
                           ]}
-                          onPress={() => toggleOption(option)}>
+                          onPress={() => toggleRating(option)}>
                           <Text
                             style={[
                               styles.optionText,
-                              isActive(option) && styles.activeOptionText,
+                              isActiveRating(option) && styles.activeOptionText,
                             ]}>
                             {option}
                           </Text>
@@ -203,6 +187,9 @@ export const Leaderboard_list = ({
                       ))}
                     </View>
                   </View>
+                  <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
+                    <Text style={styles.applyButtonText}>Apply Filters</Text>
+                  </TouchableOpacity>
                 </View>
               </TouchableWithoutFeedback>
             </View>
@@ -215,10 +202,14 @@ export const Leaderboard_list = ({
             key={index}
             style={styles.listContainer}
             onPress={() =>
-              navigation.navigate('Leader Board Details', {userId: item._id})
+              navigation.navigate('Leader Board Details', {userId: item._id, AverageRating: item.averageRating})
             }>
             <View style={styles.listItem}>
-              <Image source={{uri: item.avatar?.url}} style={styles.icon} />
+              {item.avatar?.url ? (
+                <Image source={{uri: item.avatar?.url}} style={styles.icon} />
+              ) : (
+                <Image source={require('../Assets/Images/profile.png')} style={styles.icon} />
+              )}
               <View style={styles.nameContainer}>
                 <View style={styles.titleRow}>
                   <Text style={styles.listTitle}>{item.username}</Text>
@@ -233,7 +224,6 @@ export const Leaderboard_list = ({
                 <View style={styles.listfooter}>
                   <View style={{marginRight: 10}}>
                     <Text style={{fontSize: 10}}>Direction</Text>
-
                     <View style={styles.iconWrapper}>
                       <Direction_icon />
                     </View>
@@ -253,9 +243,9 @@ export const Leaderboard_list = ({
                 </View>
               </View>
             </View>
-            <TouchableOpacity style={styles.listScore} onPress={openModal1}>
+            <TouchableOpacity style={styles.listScore}>
               <Star_icon />
-              <Text style={styles.listScoreText}>{item.averageRating}</Text>
+              <Text style={styles.listScoreText}>{item.averageRating ? item.averageRating.toFixed(1) : 'N/A'}</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         ))}
@@ -286,7 +276,7 @@ const styles = StyleSheet.create({
   icon: {
     marginRight: 5,
     width: 110,
-    height: 115,
+    height: 110,
     borderRadius: 10,
   },
   input: {
@@ -452,7 +442,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     // marginLeft: 30,
     // marginRight: 30,
-    marginTop: 10,
+    marginTop: 25,
   },
   listfooter1: {
     flexDirection: 'row',
@@ -480,7 +470,7 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#FFF',
     width: '100%',
-    height: '50%', // Only covers 50% of the screen height
+    height: '30%', // Only covers 50% of the screen height
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -532,5 +522,16 @@ const styles = StyleSheet.create({
   rightfooter: {
     justifyContent: 'flex-end',
     marginLeft: 30,
+  },
+  applyButton: {
+    backgroundColor: '#0F52BA',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  applyButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
   },
 });

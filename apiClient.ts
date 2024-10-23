@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {API_URL,API_IMAGE_URL} from '@env';
 
 // const API_URL = process.env.API_URL;
-
+// console.log(API_URL,API_IMAGE_URL);
 // Create an Axios instance
 const apiClient = axios.create({
   baseURL: `${API_URL}`, // Base URL for the API

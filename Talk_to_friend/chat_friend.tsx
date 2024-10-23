@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ImageBackground,
   GestureResponderEvent,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import socketio from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,12 +24,13 @@ import {
   ChatListItemInterface,
   ChatMessageInterface,
 } from '../context/interfaces/chat';
-import {requestHandler} from '../utils';
-import {Addfile_icon, Circle_Phone_icon, Send_icon} from '../Common/icon';
+import { requestHandler } from '../utils';
+import { Addfile_icon, Circle_Phone_icon, Send_icon } from '../Common/icon';
 import DocumentPicker from 'react-native-document-picker';
 import MessagesList from '../context/MessageItem';
+import LoaderKit from 'react-native-loader-kit';
 
-const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
+const ChatFriend = ({ route, navigation }: { route: any; navigation: any }) => {
   const CONNECTED_EVENT = 'connect';
   const DISCONNECT_EVENT = 'disconnect';
   const JOIN_CHAT_EVENT = 'joinChat';
@@ -41,38 +43,33 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [socket, setSocket] = useState<ReturnType<typeof socketio> | null>(
-    null,
-  );
+  const [socket, setSocket] = useState<ReturnType<typeof socketio> | null>(null);
   const [currentChat, setCurrentChat] = useState<any>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [chats, setChats] = useState<ChatListItemInterface[]>([]);
   const [messages, setMessages] = useState<ChatMessageInterface[]>([]);
-  const [unreadMessages, setUnreadMessages] = useState<ChatMessageInterface[]>(
-    [],
-  );
+  const [unreadMessages, setUnreadMessages] = useState<ChatMessageInterface[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [selfTyping, setSelfTyping] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const scrollViewRef = useRef<ScrollView>(null);
-
+  const [agentid, setAgent_ID] = useState('');
+  const [callstatus, setCallStatus] = useState('');
   // Initialize socket
   const initializeSocket = async () => {
     try {
+      const { AgentID } = route.params;
+      setAgent_ID(AgentID);
       const token = await AsyncStorage.getItem('authToken');
       if (!token) return;
 
-      const socketInstance = socketio('ws://driverse.onrender.com', {
+      const socketInstance = socketio('https://drivers-server-7gl0.onrender.com/', {
         transports: ['websocket'],
         withCredentials: true,
-        auth: {token},
+        auth: { token },
       });
-      // console.log('Socket initialized:', socket);
-      // socketInstance.on(CONNECTED_EVENT, () => console.log('SSocket Connected With ID:', socketInstance.id));
-      // socketInstance.on(DISCONNECT_EVENT, () => console.log('Disconnected'));
-      // socketInstance.on(MESSAGE_RECEIVED_EVENT, onMessageReceived );
-      // socketInstance.on(MESSAGE_DELETE_EVENT, onMessageDelete);
 
       setSocket(socketInstance);
     } catch (error) {
@@ -97,10 +94,8 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
   };
 
   const getMessages = async (chatId: any) => {
-    console.log('socket', socket);
     if (!chatId || !socket) return;
     const chat = socket.emit(JOIN_CHAT_EVENT, chatId);
-    console.log(chat);
     setUnreadMessages(unreadMessages.filter(msg => msg.chat !== chatId));
     requestHandler(
       async () => await getChatMessages(chatId || ''),
@@ -111,6 +106,7 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
   };
 
   const sendChatMessage = async () => {
+    setLoading(true);
     if (!message.trim() || !currentChat?._id || !socket?.id) return;
 
     socket.emit(STOP_TYPING_EVENT, currentChat._id);
@@ -120,8 +116,8 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
       res => {
         setMessage('');
         setAttachedFiles([]);
-        // setMessages(prev => [res.data, ...prev]);
         updateChatLastMessage(currentChat._id, res.data);
+        setLoading(false);
       },
       Alert.alert,
     );
@@ -129,7 +125,6 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
 
   const onConnect = () => {
     setIsConnected(true);
-    console.log('function connect got called');
   };
 
   const onDisconnect = () => {
@@ -141,30 +136,20 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
   };
 
   const onChatLeave = (chat: ChatListItemInterface) => {
-    // Check if the chat the user is leaving is the current active chat.
     if (chat._id === currentChat?._id) {
-      // If the user is in the group chat they're leaving, close the chat window.
       currentChat.current = null;
-      // Remove the currentChat from local storage.
       AsyncStorage.removeItem('currentChat');
     }
-    // Update the chats by removing the chat that the user left.
     setChats(prev => prev.filter(c => c._id !== chat._id));
   };
 
   const handleOnSocketTyping = (chatId: string) => {
-    // Check if the typing event is for the currently active chat.
     if (chatId !== currentChat?._id) return;
-    console.log('isTyping');
-    // Set the typing state to true for the current chat.
     setIsTyping(true);
   };
 
   const handleOnSocketStopTyping = (chatId: string) => {
-    // Check if the stop typing event is for the currently active chat.
     if (chatId !== currentChat?._id) return;
-
-    // Set the typing state to false for the current chat.
     setIsTyping(false);
   };
 
@@ -175,7 +160,7 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
 
     if (!selfTyping) {
       setSelfTyping(true);
-      socket.emit(TYPING_EVENT, currentChat._id); // Don't call the handler directly here
+      socket.emit(TYPING_EVENT, currentChat._id);
     }
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -249,22 +234,54 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
       setAttachedFiles(result);
     } catch (err) {
       if (DocumentPicker.isCancel(err)) {
-        console.warn('File selection canceled');
+        // User cancelled the picker
       } else {
         throw err;
       }
     }
   };
 
-  const initiateCall = (event: GestureResponderEvent) => {
-    Alert.alert('Call initiated');
+  const join_call = async () => {
+    if (!socket) return;
+
+    const user_id = await AsyncStorage.getItem('user_id');
+    // setUserID(user_id);
+
+    socket.emit('join', { userId: user_id }); // Send as object with userId property
+  }
+
+  const initiateCall = async (id: string) => {
+    if(!socket) return;
+    const userId = await AsyncStorage.getItem('user_id');
+
+    socket.emit('call',{callerId: userId,receiverId: agentid});
+    navigation.navigate('calling', {
+      mode: 'Voice',
+      caller: 'me',
+      receiver: 'abc',
+      socket: socket,
+      user_id: userId,
+      receiver_id: agentid,
+    });
+  };
+
+  const handleIncomingCall = async (callerId: any) => {
+    if ( !socket) return;
+    // socket.on('playCallerTune', handlecallertune);
+    const userId = await AsyncStorage.getItem('user_id');
+    navigation.navigate('calling_acceptance', {socket: socket, agent_id: agentid, user_id:userId});
+    setCallStatus('incoming');
+
+   
+
+
   };
 
   useEffect(() => {
-    const {chatId} = route.params;
+    const { chatId } = route.params;
     getChats();
     if (chatId) {
-      setCurrentChat({_id: chatId});
+      setCurrentChat({ _id: chatId });
       getMessages(chatId);
     }
   }, [route.params, socket]);
@@ -274,11 +291,11 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
       scrollViewRef.current.scrollToEnd({ animated: true });
     }
   }, [messages, isTyping]);
-  
 
   useEffect(() => {
-    // Set up event listeners
     if (!socket) return;
+    join_call();
+    socket.on('incomingCall', handleIncomingCall);
 
     socket.on(CONNECTED_EVENT, onConnect);
     socket.on(DISCONNECT_EVENT, onDisconnect);
@@ -290,7 +307,6 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
     socket.on(MESSAGE_DELETE_EVENT, onMessageDelete);
 
     return () => {
-      // Remove event listeners
       socket.off(CONNECTED_EVENT, onConnect);
       socket.off(DISCONNECT_EVENT, onDisconnect);
       socket.off(TYPING_EVENT, handleOnSocketTyping);
@@ -311,19 +327,38 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
           <ScrollView
             ref={scrollViewRef}
             style={styles.message_container}
-            contentContainerStyle={{flexGrow: 1, justifyContent: 'flex-end'}}>
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+            {loadingMessages && (
+              <View style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                <LoaderKit
+                  style={{ width: 50, height: 50 }}
+                  name={'BallPulseSync'}
+                  color={'black'}
+                />
+              </View>
+            )}
             {messages.map((msg, index) => (
-              <MessagesList key={index} message={msg} previousMessage={messages[index - 1] || null} onDelete={deleteMessage} />
+              <MessagesList
+                key={index}
+                message={msg}
+                previousMessage={messages[index - 1] || null}
+                onDelete={deleteMessage}
+              />
             ))}
-            {isTyping && (
-            <Text style={styles.typingText}>Typing...</Text>
-          )}
+            {isTyping && <Text style={styles.typingText}>Typing...</Text>}
           </ScrollView>
           <View style={styles.inputContainer}>
-            <TouchableOpacity style={styles.phone_call} onPress={initiateCall}>
+            <TouchableOpacity 
+              style={styles.phone_call} 
+              onPress={() => initiateCall(agentid)}
+            >
               <Circle_Phone_icon />
             </TouchableOpacity>
-            <TouchableOpacity style={{marginRight: 10}} onPress={pickFiles}>
+            <TouchableOpacity style={{ marginRight: 10 }} onPress={pickFiles}>
               <Addfile_icon />
             </TouchableOpacity>
             <TextInput
@@ -332,9 +367,13 @@ const ChatFriend = ({route, navigation}: {route: any; navigation: any}) => {
               onChangeText={handleOnMessageChange}
               placeholder="Type a message..."
             />
-            <TouchableOpacity style={{marginLeft: 6}} onPress={sendChatMessage}>
-              <Send_icon />
-            </TouchableOpacity>
+            {loading ? (
+              <ActivityIndicator size={'large'} color={'#000'} />
+            ) : (
+              <TouchableOpacity style={{ marginLeft: 6 }} onPress={sendChatMessage}>
+                <Send_icon />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       ) : (
@@ -373,8 +412,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 8,
   },
-  typingText:{
-    fontSize:15,
+  typingText: {
+    fontSize: 15,
     alignSelf: 'flex-start',
     backgroundColor: '#fff',
     padding: 10,

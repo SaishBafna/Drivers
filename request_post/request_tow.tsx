@@ -23,9 +23,7 @@ import apiClient from '../apiClient';
 import {AxiosError} from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const Request_Tow = (props: {
-  navigation: {navigate: (arg0: string) => void};
-}) => {
+export const Request_Tow = ({navigation}: {navigation: any}) => {
   const [selectedValue, setSelectedValue] = useState('');
   const [selectedtruck, setSelectedTruck] = useState('');
   const [selectedtrailer, setSelectedTrailer] = useState('');
@@ -45,6 +43,7 @@ export const Request_Tow = (props: {
   const [userType, setUserType] = useState('');
   const [truckNumbers, setTruckNumbers] = useState<string[]>([]); // State for truck numbers
   const [trailerNumbers, setTrailerNumbers] = useState<string[]>([]); // State for trailer numbers
+  const [loading, setLoading] = useState(false);
 
   interface ApiErrorResponse {
     message: string;
@@ -79,7 +78,7 @@ export const Request_Tow = (props: {
 
       console.log(vehicles); // Log the vehicles data
     } catch (error: any) {
-      console.error('Error fetching data:', error.message || error);
+      // console.error('Error fetching data:', error.message || error);
     }
   };
 
@@ -95,6 +94,8 @@ export const Request_Tow = (props: {
   };
 
   const handleSubmit = async () => {
+    setLoading(true);
+
     const user_id = await AsyncStorage.getItem('user_id');
     let vehicleType = '';
 
@@ -176,12 +177,16 @@ export const Request_Tow = (props: {
 
       if (response) {
         Alert.alert('Success', 'Your request has been submitted successfully!');
-        props.navigation.navigate('Leader Board');
+        navigation.navigate('Leader Board', { serviceType: 'Tower' });
       } else {
         //@ts-ignore
         Alert.alert('Error', response.data || 'Something went wrong!');
       }
+      setLoading(false);
+
     } catch (error) {
+      setLoading(false);
+
       const err = error as AxiosError<ApiErrorResponse>;
       console.log(err);
       Alert.alert(
@@ -349,7 +354,7 @@ export const Request_Tow = (props: {
       </TouchableOpacity> */}
       <TouchableOpacity
         style={styles.button}
-        onPress={() => props.navigation.navigate('Leader Board')}>
+        onPress={() => navigation.navigate('Leader Board', { serviceType: 'Tower' })}>
         <Text style={styles.buttonText}>Continue</Text>
       </TouchableOpacity>
     </ScrollView>

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "129819951977",
+    "project_id": "driverse-cc7f9",
+    "storage_bucket": "driverse-cc7f9.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129819951977:android:d43bbfc1b88d7a7d64f3f8",
+        "android_client_info": {
+          "package_name": "com.drivers_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkAB5i4UkCOaKFvmlsJwp9E1dTWm8cNnY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129819951977:android:ad3d3df38ac2a2f964f3f8",
+        "android_client_info": {
+          "package_name": "com.driverse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkAB5i4UkCOaKFvmlsJwp9E1dTWm8cNnY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

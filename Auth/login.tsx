@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Button,
   StatusBar,
@@ -8,65 +8,140 @@ import {
   TextInput,
   View,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import {LogosApple, LogosGoogle, LogosGoogleGmail} from '../Common/icon';
 import CustomButton from '../Common/custombutton ';
 import PasswordInput from './password';
 import {InputLable, NormalInput} from '../Common/input_componenet';
-import axios, { Axios, AxiosError } from 'axios';
+import axios, {Axios, AxiosError} from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import  handleLoginSuccess  from '../apiClient';
+import handleLoginSuccess from '../apiClient';
 //@ts-ignore
 import {API_URL, API_IMAGE_URL} from '@env';
+import LoaderKit from 'react-native-loader-kit';
+import { requestUserPermission } from '../notification/notification';
 
 interface ApiErrorResponse {
   message: string;
 }
-
-
 
 export const Login = (props: {
   navigation: {navigate: (arg0: string) => void};
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // console.log(API_URL,API_IMAGE_URL);  
+  const [loading, setLoading] = useState(false); // Add loading state
+  // console.log(API_URL,API_IMAGE_URL);
+  // let fcmtoken = null;
+
+  const [fcmToken, setFcmToken] = useState(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const tokenauth = await AsyncStorage.getItem('authToken');
+        // const tokenauth = null;
+        const serviceType = await AsyncStorage.getItem('serviceType');
+        
+        if (tokenauth) {
+          switch (serviceType) {
+            case '9494':
+              props.navigation.navigate('Agent');
+              break;
+            case '9797':
+              props.navigation.navigate('Home');
+              break;
+            case '9696':
+              props.navigation.navigate('Mechanic_home');
+              break;
+            case '9595':
+              props.navigation.navigate('Towing');
+              break;
+            case '9393':
+              props.navigation.navigate('Company');
+              break;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+      }
+    };
+   
+    const getToken = async () => {
+      const setupNotifications = async () => {
+        try {
+          const token = await requestUserPermission();
+          if (token) {
+            console.log('Notification permission granted. Token:', token);
+            // You can send this token to your server here
+            setFcmToken(token);
+
+          } else {
+            console.log('Failed to get notification permission');
+          }
+        } catch (error) {
+          console.error('Error setting up notifications:', error);
+        }
+      };
+  
+      setupNotifications();
+      
+    };
+
+
+    checkAuth();
+    getToken();
+  }, []);
+
+
+
   const handleLogin = async () => {
+
+    setLoading(true); // Set loading to true when the API call starts
     const payload = {
       email: email,
       password: password,
+      deviceToken: fcmToken,
     };
-  
+
+    
+
+    
     try {
-      let res = await axios.post(`${API_URL}login`,payload)
+      let res = await axios.post(`https://drivers-server-7gl0.onrender.com/api/v1/auth/login`, payload);
       const data = res.data;
       await AsyncStorage.setItem('authToken', data.accessToken);
-    await AsyncStorage.setItem('user_id', data._id);
-    await AsyncStorage.setItem('refreshToken', data.refreshToken);
-    await AsyncStorage.setItem('serviceType', data.serviceType.toString());
-      if(res.status === 200){
-        if(res.data.serviceType === 9494){
+      await AsyncStorage.setItem('user_id', data._id);
+      await AsyncStorage.setItem('refreshToken', data.refreshToken);
+      await AsyncStorage.setItem('serviceType', data.serviceType.toString());
+      if (res.status === 200) {
+        if (res.data.serviceType === 9494) {
           props.navigation.navigate('Agent');
-        }else if(res.data.serviceType === 9797){
+        } else if (res.data.serviceType === 9797) {
           props.navigation.navigate('Home');
-        }else if(res.data.serviceType === 9696){
+        } else if (res.data.serviceType === 9696) {
           props.navigation.navigate('Mechanic_home');
-        }else if(res.data.serviceType === 9595){
+        } else if (res.data.serviceType === 9595) {
           props.navigation.navigate('Towing');
-        }else if(res.data.serviceType === 9393){
+        } else if (res.data.serviceType === 9393) {
           props.navigation.navigate('Company');
         }
       }
-      
+      setLoading(false); // Set loading to true when the API call starts
+
     } catch (error) {
-      
-    
-  
       // Enhanced error handling
+      setLoading(false); // Set loading to true when the API call starts
+
       const err = error as AxiosError<ApiErrorResponse>;
-      const errorMessage = err.response?.data?.message || 'Something went wrong. Please try again later.';
-      console.log('Error:',err)
+      const errorMessage =
+        err.response?.data?.message ||
+        'Something went wrong. Please try again later.';
+      console.log('Error:', err);
       Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false); // Set loading to false once the API call is finished
     }
   };
   return (
@@ -91,7 +166,22 @@ export const Login = (props: {
 
       <PasswordInput passwordvalue={password} passwordpass={setPassword} />
 
-      <CustomButton icon={<></>} title="Continue" onPress={handleLogin} />
+      <CustomButton
+        icon={<></>}
+        title={
+          loading ? (
+            <LoaderKit
+              style={{width: 30, height: 20}}
+              name={'BallPulse'} // Optional: see list of animations below
+              color={'white'} // Optional: color can be: 'red', 'green',... or '#ddd', '#ffffff',...
+            />
+          ) : (
+            'Continue'
+          )
+        }
+        onPress={handleLogin}
+        disabled={loading} // Disable the button while loading
+      />
       {/* <CustomButton icon={<></>} title="Continue" onPress={() => props.navigation.navigate('Call')} /> */}
 
       <View style={styles.linkContainer}>
@@ -163,7 +253,6 @@ const styles = StyleSheet.create({
     color: 'black',
   },
 
-  
   //Forgot password and Create Account designs
 
   linkContainer: {

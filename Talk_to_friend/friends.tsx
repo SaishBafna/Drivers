@@ -1,74 +1,79 @@
-import React, {useEffect, useState} from 'react';
-import {Image, StyleSheet, Text, View, TouchableOpacity, Alert} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import apiClient from '../apiClient';
-import WaveLoader, {Phonecall, Phonecall_white} from '../Common/icon';
+import WaveLoader, { Phonecall, Phonecall_white } from '../Common/icon';
 import FooterBar from '../Common/footer';
-// import {useSocket} from '../context/socket';
-import {LocalStorage} from '../utils';
 import socketio from 'socket.io-client';
-import {SOCKET_URI} from '@env';
-
-
+import { SOCKET_URI } from '@env';
+import LoaderKit from 'react-native-loader-kit';
+import ringtonePath from '../Assets/Sounds/rington.mp3';
+import callerTunePath from '../Assets/Sounds/caller.mp3';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Sound from 'react-native-sound';
 
-export const Friends = ({navigation}: {navigation: any}) => {
+export const Friends = ({ navigation }) => {
   const [data, setData] = useState([]);
-  const [socket, setSocket] = useState<ReturnType<typeof socketio> | null>(
-    null,
-  );
+  const [socket, setSocket] = useState(null);
   const [loading, setLoading] = useState(false);
-  // const initializeSocket = async () => {
-  //   try {
-  //     const token = await AsyncStorage.getItem('authToken');
-  //     if (!token) {
-  //       console.warn('No authToken found in AsyncStorage');
-  //       return;
-  //     }
 
-  //     const socketInstance = socketio('https://driverse.onrender.com', {
-  //       transports: ['websocket'] ,
-  //       withCredentials: true,
-  //       auth: {token},
-        
-  //     });
+  useEffect(() => {
+    const initializeSocket = async () => {
+      try {
+        const token = await AsyncStorage.getItem('authToken');
+        if (!token) {
+          console.warn('No authToken found in AsyncStorage');
+          return;
+        }
 
-  //     // Set up socket event listeners
-  //     socketInstance.on('connect', () => {
-  //       console.log('Socket connected:', socketInstance.id);
-  //     });
+        const socketInstance = socketio(SOCKET_URI, {
+          transports: ['websocket'],
+          withCredentials: true,
+          auth: { token },
+        });
 
-  //     socketInstance.on('connect_error', error => {
-  //       console.error('Socket connection error:', error);
-  //       Alert.alert('Error', 'Failed to connect to the server.');
-  //     });
+        socketInstance.on('connect', () => {
+          console.log('Socket connected:', socketInstance.id);
+        });
 
-  //     socketInstance.on('disconnect', () => {
-  //       console.log('Socket disconnected');
-  //     });
+        socketInstance.on('connect_error', error => {
+          console.error('Socket connection error:', error);
+          Alert.alert('Error', 'Failed to connect to the server.');
+        });
 
-  //     setSocket(socketInstance);
-  //   } catch (error) {
-  //     console.error('Error initializing socket:', error);
-  //     Alert.alert('Error', 'Failed to initialize socket connection.');
-  //   }
-  // };
+        socketInstance.on('disconnect', () => {
+          console.log('Socket disconnected');
+        });
 
-  // useEffect(() => {
-  //   initializeSocket();
+        setSocket(socketInstance);
+      } catch (error) {
+        console.error('Error initializing socket:', error);
+        Alert.alert('Error', 'Failed to initialize socket connection.');
+      }
+    };
 
-  //   return () => {
-  //     if (socket) {
-  //       console.log('Cleaning up socket connection...');
-  //       socket.disconnect();
-  //     }
-  //   };
-  // }, []);
+    initializeSocket();
+
+    return () => {
+      if (socket) {
+        console.log('Cleaning up socket connection...');
+        socket.disconnect();
+      }
+    };
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const response = await apiClient.get('chats/agents');
       setData(response.data.data);
+      console.log(response.data.data);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -76,24 +81,86 @@ export const Friends = ({navigation}: {navigation: any}) => {
     }
   };
 
-  const createOrOpenChat = async (id: string, name: string) => {
+  const createOrOpenChat = async (id, name, profile) => {
+    console.log(id);
     try {
       const response = await apiClient.post(`chats/c/${id}`);
-      const chat = response.data.chat;
-      // console.log(chat, chat.participants[0])
-      // Store chat info and navigate to chat room with the friend's name
-      LocalStorage.set('currentChat', chat);
-      navigation.navigate('Chat', { chatId: chat._id, friendName: name, AgentID: id });
-  
-      // Notify server about the new chat
-      // if (socket) {
-      //   socket.emit('joinChat', chat._id);
-      // }
+      const chat = response.data.data;
+      console.log(response.data.data);
+      // LocalStorage.set('currentChat', chat);
+      navigation.navigate('Chat', {
+        chatId: chat._id,
+        friendName: name,
+        AgentID: id,
+        ProfileImage: profile,
+      });
     } catch (error) {
       console.error('Error creating or opening chat:', error);
     }
   };
+
+  const initiateCall = async (id, username, url) => {
+    if (!socket) {
+      console.error('Socket is not initialized');
+      return;
+    }
   
+    try {
+      const callerid = await AsyncStorage.getItem('user_id');
+  
+      // Notify the server to initiate the call
+      socket.emit('call', { callerId: callerid, receiverId: id });
+      console.log('Call initiated:', { callerId: callerid, receiverId: id });
+  
+      // playCallerTune();
+  
+      // Handle incoming call event
+      socket.on('incomingCall', ({ callerId }) => {
+        // playRingtone();
+        showIncomingCallUI(callerId, url);
+        navigation.navigate('calling_acceptance');
+      });
+    } catch (error) {
+      console.error('Error initiating call:', error);
+    }
+  };
+  
+  
+  const playTune = (tuneRef, fileName) => {
+    if (tuneRef.current) {
+      tuneRef.current.stop();
+      tuneRef.current.release();
+    }
+    tuneRef.current = new Sound(fileName, Sound.MAIN_BUNDLE, (error) => {
+      if (error) {
+        console.error('Failed to load the sound', error);
+        return;
+      }
+      tuneRef.current.play((success: any) => {
+        if (!success) {
+          console.error('Playback failed due to audio decoding errors');
+        }
+      });
+    });
+  };
+  
+
+  const playCallerTune = () => {
+    playTune('', callerTunePath);
+  };
+  
+  const playRingtone = () => {
+    playTune('', ringtonePath);
+  };
+
+  const showIncomingCallUI = (callerId, url) => {
+    // Navigate to the calling screen or show incoming call UI
+    navigation.navigate('CallingScreen', {
+      mode: 'receiver',
+      caller: { id: callerId },
+      receiver: { id: url },
+    });
+  };
 
   useEffect(() => {
     fetchData();
@@ -101,33 +168,59 @@ export const Friends = ({navigation}: {navigation: any}) => {
 
   return (
     <View style={styles.outerContainer}>
-      {/* <Text style={styles.heading}>
-        Having any query? Let's talk to a friend
-      </Text> */}
       <View style={styles.container}>
-        {loading ? (<View style={{flex:1,justifyContent:'center',alignItems:'center'}}>
-          <WaveLoader size={20} darkColor="#000000" lightColor="gray" />
+        {loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <LoaderKit
+              style={{ width: 50, height: 50 }}
+              name={'BallPulseSync'}
+              color={'black'}
+            />
           </View>
         ) : (
           data.map(friend => (
             <React.Fragment key={friend._id}>
               <TouchableOpacity
                 style={styles.friend_container}
-                onPress={() => createOrOpenChat(friend._id, friend.username)}>
+                onPress={() =>
+                  createOrOpenChat(
+                    friend._id,
+                    friend.username,
+                    friend.avatar?.url,
+                  )
+                }>
                 <View style={styles.friendsub_container}>
                   <View style={styles.img_container}>
-                    <Image
-                      source={require('../Assets/Images/profile.png')}
-                      style={styles.profileImage}
-                      resizeMode="cover"
-                    />
+                    {friend.avatar?.url ? (
+                      <Image
+                        source={{ uri: friend.avatar?.url }}
+                        style={styles.profileImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Image
+                        source={require('../Assets/Images/profile.png')}
+                        style={styles.profileImage}
+                        resizeMode="cover"
+                      />
+                    )}
                   </View>
                   <View style={styles.name_container}>
                     <Text style={styles.name}>{friend.username}</Text>
-                    <Text style={styles.date_time}>{new Date(friend.updatedAt).toLocaleString()}</Text>
+                    <Text style={styles.date_time}>
+                      {new Date(friend.updatedAt).toLocaleString()}
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.button}>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={() =>
+                    initiateCall(
+                      friend._id,
+                      friend.username,
+                      friend.avatar?.url,
+                    )
+                  }>
                   <Phonecall_white />
                   <Text style={styles.buttonText}>Call Me</Text>
                 </TouchableOpacity>
@@ -146,7 +239,7 @@ const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor:'#fff'
+    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
@@ -180,7 +273,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     overflow: 'hidden',
     justifyContent: 'flex-start',
-    backgroundColor: 'black',
+    backgroundColor: 'white',
   },
   profileImage: {
     width: 55,
@@ -210,12 +303,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 5,
   },
-  hrline:{
-    width: '100%', // Full width of the container or adjust as needed
+  hrline: {
+    width: '100%',
     height: 0.3,
     backgroundColor: '#D3D3D3',
   },
-  date_time:{
-    fontSize:10
+  date_time: {
+    fontSize: 10,
   },
 });

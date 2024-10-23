@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -14,9 +14,13 @@ import {
 } from '../Common/icon';
 import FooterBar from '../Common/footer';
 import { Picker } from '@react-native-picker/picker';
+import {  requestUserPermission } from '../notification/notification';
 
 export const Home = (props: { navigation: { navigate: (arg0: string) => void; }; }) => {
   const [selectedValue, setSelectedValue] = useState('Now');
+
+ 
+
   return (
     <View style={styles.outerContainer}>
       <View style={styles.container}>

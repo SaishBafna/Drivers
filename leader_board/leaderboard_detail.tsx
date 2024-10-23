@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Image,
   StyleSheet,
@@ -8,6 +8,9 @@ import {
   ScrollView,
   Linking,
   Alert,
+  Modal,
+  TextInput,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import FooterBar from '../Common/footer';
 import {
@@ -15,9 +18,14 @@ import {
   Phonecall,
   Phonecall_light,
   Star_icon,
+  Star_icon_big,
+  Star_icon_stroke,
   Verify_Tick,
 } from '../Common/icon';
 import apiClient from '../apiClient';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Import MaterialCommunityIcons
+import CustomButton from '../Common/custombutton ';
+import LoaderKit from 'react-native-loader-kit';
 
 export const Leaderboard_detail = ({
   route,
@@ -26,59 +34,158 @@ export const Leaderboard_detail = ({
   route: any;
   navigation: any;
 }) => {
-
   const phoneNumber = '+91-1234567890'; // Static number for now
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [Submitting, setSubmitting] = useState(false);
   const [review, setReview] = useState(false);
-  
-  const fetchData = async (page: number = 1, limit: number = 10) => {
-    const {userId} = route.params;
-    try {
-   
-        setLoading(true);
-     
+  const [avgrating, setAvgrating] = useState();
+  const [modalVisible1, setModalVisible1] = useState(false); // Modal visibility state
+  const [rating, setRating] = useState(0); // Rating state
+  const [comment, setComment] = useState(''); // Comment state
+  const [replycomment, setreplySubmitting] = useState(false); // Comment state
+  const [reviewId, setReviewId] = useState(''); // Comment state
 
-      const response = await apiClient.get(
-        `user/${userId}`,
-      );
-      const comment_response = await apiClient.get(
-        `reviews/${userId}`,
-      );
-      console.log(comment_response.data.reviews);
-      setData(response.data.user);
-      setReview(comment_response.data.reviews);
+  const fetchData = async (page: number = 1, limit: number = 10) => {
+    const { userId } = route.params;
+    const { AverageRating } = route.params;
+    setAvgrating(AverageRating);
+    try {
+        setLoading(true);
+
+        const response = await apiClient.get(`user/${userId}`);
+        // const comment_response = await apiClient.get(`reviews/${userId}`);
+
+        setData(response.data.user);
+        
+        // Check if comment_response has data
+            // setReview(comment_response.data.reviews);
+        
     } catch (error: any) {
-      console.error('Error fetching data:', error.message || error);
-      setLoading(false);
+        console.error('Error fetching data:', error.message || error);
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+  const handleReply = async () => {
+    setreplySubmitting(true); // Set the loading/submitting state
+    const {userId} = route.params;
+    console.log(reviewId);
+    try {
+      // Prepare JSON data
+      const requestBody = {
+        comment,
+      };
+
+      // Log the request body for debugging
+      console.log('Request Body:', requestBody);
+
+      // Make the API request with JSON body
+      const response = await apiClient.post(
+        `/reviews/${reviewId}/comment`,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', // Add the token here
+          },
+        },
+      );
+
+      Alert.alert('Success', 'Your request has been submitted successfully!');
+      // Handle success (you can display a success message, etc.)
+
+      // Add the new comment to the existing reviews state
+      fetchData();
+      setModalVisible1(false);
+      console.log('Review submitted successfully:', response.data);
+    } catch (error) {
+      // Handle error (e.g., display error message)
+      console.error('Error submitting review:', error.message || error);
+      Alert.alert('Error', 'Failed to submit the review. Please try again.');
+    } finally {
+      setreplySubmitting(false); // Reset the loading/submitting state
+    }
+  };
+
+  const handleRate = async () => {
+    setSubmitting(true); // Set the loading/submitting state
+    const {userId} = route.params;
+
+    try {
+      // Prepare JSON data
+      const requestBody = {
+        rating,
+        comment,
+      };
+
+      // Log the request body for debugging
+      console.log('Request Body:', requestBody);
+
+      // Make the API request with JSON body
+      const response = await apiClient.post(`/reviews/${userId}`, requestBody, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      Alert.alert('Success', 'Your request has been submitted successfully!');
+      // Handle success (you can display a success message, etc.)
+      console.log('Review submitted successfully:', response.data);
+    } catch (error) {
+      // Handle error (e.g., display error message)
+      console.error('Error submitting review:', error.message || error);
+      Alert.alert('Error', 'Failed to submit the review. Please try again.');
+    } finally {
+      setSubmitting(false); // Reset the loading/submitting state
     }
   };
 
   useEffect(() => {
     fetchData(); // Initial fetch
   }, []);
-  
-  const makePhoneCall = (phone:string) => {
+
+  // Function to open the modal
+  const openModal = (review_id: any) => {
+    setModalVisible1(true);
+    setReviewId(review_id);
+  };
+
+  // Function to close the modal
+  const closeModal = () => setModalVisible1(false);
+
+  const makePhoneCall = (phone: string) => {
     const url = `tel:${phone}`;
     Linking.canOpenURL(url)
-      .then((supported) => {
+      .then(supported => {
         if (supported) {
           return Linking.openURL(url);
         } else {
           Alert.alert('Error', 'Your device does not support this action');
         }
       })
-      .catch((err) => console.error('Error occurred', err));
+      .catch(err => console.error('Error occurred', err));
   };
-  
+
   return (
     <View style={styles.outerContainer}>
       <ScrollView style={styles.scroll}>
         <View style={styles.image}>
-          <Image
+          {data.avatar?.url ? (
+            <Image source={{uri: data.avatar?.url}} style={styles.icon} />
+          ) : (
+            <Image
+              source={require('../Assets/Images/profile.png')}
+              style={styles.icon}
+            />
+          )}
+
+          {/* <Image
             source={{uri: data.avatar?.url}}
             style={styles.icon}
-          />
+          /> */}
         </View>
         <View style={styles.listItem}>
           <View style={styles.nameContainer}>
@@ -87,88 +194,223 @@ export const Leaderboard_detail = ({
               <Verify_Tick />
             </View>
           </View>
-          <View style={styles.listScore}>
+          {/* Rating Section with Touchable */}
+          <TouchableOpacity style={styles.listScore}>
             <Star_icon />
-            <Text style={styles.listScoreText}>{data.averageRating}</Text>
-          </View>
+            <Text style={styles.listScoreText}>
+              {avgrating && avgrating.toFixed(1)}
+            </Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.address_section}>
           <Location_icon1 />
-          <Text style={styles.address}>
-          {data.companyAddress}
-          </Text>
+          <Text style={styles.address}>{data.companyAddress}</Text>
         </View>
-        <View style={styles.details_section}>
-          <Text style={styles.details}>
-            Comprehensive brake inspection and repair services to ensure your
-            vehicle's safety and performance.
-          </Text>
+        <View>
+          <View style={styles.phone_section}>
+            <Text style={styles.phone}>{data.phone}</Text>
+            <TouchableOpacity
+              style={styles.call_button}
+              onPress={() => makePhoneCall(data.phone)}>
+              <View style={styles.iconTextContainer}>
+                <Phonecall_light />
+                <Text style={styles.call_text}> Call</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* This is rating form */}
+          <View style={styles.ratingModalOverlay}>
+            <View style={styles.ratingModalContent}>
+              {/* Rating Heading */}
+              <Text style={styles.ratingModalHeader}>Rate Us</Text>
+
+              {/* 5 Stars Rating */}
+              <View style={styles.ratingStarContainer}>
+                {Array.from({length: 5}, (_, index) => {
+                  const starNumber = index + 1;
+                  return (
+                    <TouchableOpacity
+                      key={starNumber}
+                      onPress={() => setRating(starNumber)}>
+                      {starNumber <= rating ? (
+                        <Star_icon_big /> // Filled star
+                      ) : (
+                        <Star_icon_stroke /> // Transparent star (non-selected)
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Comment Section */}
+              <Text style={styles.ratingCommentLabel}>Comment:</Text>
+              <TextInput
+                style={styles.ratingTextArea}
+                multiline={true}
+                numberOfLines={4}
+                placeholder="Write your comment here..."
+                value={comment}
+                onChangeText={setComment}
+              />
+
+              {/* Submit Button */}
+              <View>
+                <CustomButton
+                  icon={<></>}
+                  title={
+                    Submitting ? (
+                      <LoaderKit
+                        style={{width: 30, height: 20}}
+                        name={'BallPulse'} // Optional: see list of animations below
+                        color={'white'} // Optional: color can be: 'red', 'green',... or '#ddd', '#ffffff',...
+                      />
+                    ) : (
+                      'Submit'
+                    )
+                  }
+                  onPress={handleRate}
+                  disabled={Submitting} // Disable the button while loading
+                />
+              </View>
+            </View>
+          </View>
         </View>
-        <View style={styles.phone_section}>
-          <Text style={styles.phone}>{data.phone}</Text>
-          <TouchableOpacity style={styles.call_button} onPress={() => makePhoneCall(data.phone)}>
-        <View style={styles.iconTextContainer}>
-          <Phonecall_light />
-          <Text style={styles.call_text}> Call</Text>
-        </View>
-      </TouchableOpacity>
-        </View>
+
         <View style={styles.comment_section}>
           <Text style={styles.comment_title}>Comments</Text>
-          {Array.isArray(review) && review.map((review: any, index: number) => {
-  console.log(review.comments); // Logging the text before returning JSX
-  
-  return (
-    <View style={styles.comment_card} key={index}>
-      <View style={styles.name_section}>
-        <View style={styles.img_name}>
-          <Image
-            source={{ uri: review.reviewerInfo.avatar?.url || 'fallback_image_url' }}
-            style={styles.profile_icon}
-          />
-          <Text style={styles.comment_author}>{review.reviewerInfo.username}</Text>
-        </View>
-        <View style={styles.listScore_comment}>
-          <Star_icon />
-          <Text style={styles.listScoreText}>{review.rating}</Text>
-        </View>
-      </View>
-      <View style={styles.comment}>
-        <Text style={styles.comment_text}>{review.comments.text}</Text>
-      </View>
-      <View>
-        <Text style={styles.comment_date}>{review.date}</Text>
-      </View>
-    </View>
-  );
-})}
+          {Array.isArray(review) &&
+            review.map((review: any, index: number) => {
+              // console.log(review); // Logging the text before returning JSX
 
+              return (
+                <View style={styles.comment_card} key={index}>
+                  <View style={styles.name_section}>
+                    <View style={styles.img_name}>
+                      <Image
+                        source={require('../Assets/Images/profile.png')}
+                        // source={{ uri: review.reviewerInfo.avatar?.url || 'fallback_image_url' }}
+                        style={styles.profile_icon}
+                      />
+                      <View>
+                        <Text style={styles.comment_author}>
+                          {review.reviewerInfo.username}
+                        </Text>
+                        <Text style={styles.email}>
+                          {review.reviewerInfo.email}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.listScore_comment}>
+                      <Star_icon />
+                      <Text style={styles.listScoreText}>{review.rating}</Text>
+                    </View>
+                    
+                  </View>
+                  <View><Text style={styles.comment}>{review.review}</Text></View>
+                  {Array.isArray(review.comments) &&
+                    review.comments.map(
+                      (comment: any, commentIndex: number) => {
+                       
+                        return (
+                          <View
+                            style={styles.comment1}
+                            key={commentIndex}>
+                            <View style={styles.name_section}>
+                              <View style={styles.img_name}>
+                                <Image
+                                  source={{
+                                    uri:
+                                      comment.commenter.avatar ||
+                                      require('../Assets/Images/profile.png'),
+                                  }}
+                                  style={styles.profile_icon}
+                                />
+                                <View>
+                                  <Text style={styles.comment_author}>
+                                    {comment.commenter.username}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                            <Text style={styles.comment_text}>
+                              {comment.text}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => openModal(review._id)}>
+                              <Text style={styles.reply}>Reply</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      },
+                    )}
 
-          <View style={styles.comment_card}>
-          <View style={styles.name_section}>
-            <View style={styles.img_name}>
-            <Image
-              source={require('../Assets/Images/profile.png')}
-              style={styles.profile_icon}
-            />
-            <Text style={styles.comment_author}>John Doe</Text>
-            </View>
-            <View style={styles.listScore_comment}>
-              <Star_icon />
-              <Text style={styles.listScoreText}>4.5</Text>
-            </View>
-          </View>
-          <View style={styles.comment}>
-            <Text style={styles.comment_text}>I highly recommend John deo to anyone looking for a reliable and knowledgeable mechanic.</Text>
-          </View>
-          <View>
-            <Text style={styles.comment_date}>jan 18,2024</Text>
-          </View>
-          </View>
+                  <View>
+                    <Text style={styles.comment_date}>{review.date}</Text>
+                  </View>
+                </View>
+              );
+            })}
         </View>
+
+        {/* Modal for Rating */}
+        {modalVisible1 && (
+          <Modal
+            transparent={true}
+            visible={modalVisible1}
+            animationType="slide"
+            onRequestClose={closeModal}>
+            <View style={styles.ratingModalOverlay1}>
+              <TouchableWithoutFeedback onPress={closeModal}>
+                <View style={styles.ratingModalOverlayTouchable1} />
+              </TouchableWithoutFeedback>
+              <View style={styles.ratingModalContent1}>
+                {/* Close Button */}
+                <TouchableOpacity
+                  style={styles.ratingCloseButton}
+                  onPress={closeModal}>
+                  <Icon name="close" size={24} color="#000" />
+                </TouchableOpacity>
+
+                {/* Rating Heading */}
+                <Text style={styles.ratingModalHeader}>Reply Comment</Text>
+
+                {/* 5 Stars Rating */}
+
+                {/* Comment Section */}
+                <Text style={styles.ratingCommentLabel1}>Comment:</Text>
+                <TextInput
+                  style={styles.ratingTextArea}
+                  multiline={true}
+                  numberOfLines={4}
+                  placeholder="Write your comment here..."
+                  value={comment}
+                  onChangeText={setComment}
+                />
+
+                {/* Submit Button */}
+                <CustomButton
+                  icon={<></>}
+                  title={
+                    replycomment ? (
+                      <LoaderKit
+                        style={{width: 30, height: 20}}
+                        name={'BallPulse'} // Optional: see list of animations below
+                        color={'white'} // Optional: color can be: 'red', 'green',... or '#ddd', '#ffffff',...
+                      />
+                    ) : (
+                      'Submit'
+                    )
+                  }
+                  onPress={handleReply}
+                  disabled={replycomment} // Disable the button while loading
+                />
+              </View>
+            </View>
+          </Modal>
+        )}
       </ScrollView>
       <FooterBar />
-      
     </View>
   );
 };
@@ -283,7 +525,7 @@ const styles = StyleSheet.create({
   },
   phone_section: {
     marginHorizontal: 20,
-    marginTop: 10,
+    marginTop: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -332,47 +574,181 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 20,
-    justifyContent:'space-between'
+    justifyContent: 'space-between',
   },
   profile_icon: {
-    width: 50,
-    height: 50,
+    width: 35,
+    height: 35,
     borderRadius: 25,
     marginRight: 10,
   },
   comment_author: {
-    fontSize: 16,
-    color: '#555',
+    fontSize: 18,
+    color: '#000',
     fontWeight: 'bold',
   },
-  img_name:{
-    flexDirection:'row',
-    justifyContent:'center',
-    alignItems:'center'
+  email: {
+    fontSize: 12,
   },
-  comment:{
-    marginHorizontal:10,
-    marginVertical:10,
-    textAlign:'justify'
+  img_name: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  comment_card:{
-    backgroundColor:'#fff',
-    paddingHorizontal:10,
+  comment: {
+    marginHorizontal: 10,
+    marginVertical: 10,
+    textAlign: 'justify',
+    fontSize: 16,
+    color: '#000',
+  },
+  comment1: {
+    marginHorizontal: 10,
+    // marginVertical: 10,
+    marginLeft:20,
+    textAlign: 'right',
+
+  },
+  reply: {
+    // marginTop: 10,
+    color: 'blue',
+  },
+  comment_card: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 10,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    borderRadius:10,
-    marginBottom:10
+    borderRadius: 10,
+    marginBottom: 10,
   },
-  comment_text:{
-    fontSize:16,
-    color:'#000'
+  comment_text: {
+    fontSize: 16,
+    color: '#000',
   },
-  comment_date:{
+
+  comment_date: {
     textAlign: 'right',
     marginVertical: 10,
+  },
+  rating_overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  ratingModalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+  },
+  ratingModalOverlayTouchable: {
+    flex: 1,
+  },
+  ratingModalContent: {
+    backgroundColor: 'transparent',
+    width: '100%',
+    height: '100%', // Full height
+    padding: 20,
+    // justifyContent: 'center',
+  },
+  ratingCloseButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  ratingModalHeader: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    // marginTop: 40,
+    // textAlign: 'center',
+  },
+  ratingStarContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginBottom: 20,
+  },
+  ratingStar: {
+    marginHorizontal: 5,
+  },
+  ratingCommentLabel: {
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  ratingTextArea: {
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    fontSize: 16,
+    height: 50,
+    marginBottom: 20,
+  },
+  rating_overlay1: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  ratingModalOverlay1: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+  },
+  ratingModalOverlayTouchable1: {
+    flex: 1,
+  },
+  ratingModalContent1: {
+    backgroundColor: '#FFF',
+    width: '100%',
+    height: '50%', // Full height
+    padding: 20,
+    // justifyContent: 'center',
+  },
+  ratingCloseButton1: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  ratingModalHeader1: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    marginTop: 40,
+    // textAlign: 'center',
+  },
+  ratingStarContainer1: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginBottom: 20,
+  },
+  ratingStar1: {
+    marginHorizontal: 5,
+  },
+  ratingCommentLabel1: {
+    fontSize: 18,
+    marginBottom: 10,
+  },
+  ratingTextArea1: {
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    fontSize: 16,
+    height: 100,
+    marginBottom: 20,
+  },
+  ratingSubmitButton: {
+    backgroundColor: '#000', // Blue background
+    borderRadius: 10,
+    padding: 15,
+    alignItems: 'center',
+  },
+  ratingSubmitButtonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -34,6 +34,9 @@ export const Profile = (props: {
   navigation: {navigate: (arg0: string) => void};
 }) => {
 
+  
+  
+
   const handleLogout = async() => {
     try {
       const refreshToken = await AsyncStorage.getItem('refreshToken');
@@ -41,7 +44,7 @@ export const Profile = (props: {
   
       // Prepare the body with the refresh token
       const requestBody = {
-        token: refreshToken,
+        refreshToken: refreshToken,
       };
 
             // console.log(requestBody);
@@ -114,6 +117,10 @@ export const Profile = (props: {
         </View>
         <View style={styles.horizontalLine} />
         <View>
+            <TouchableOpacity style={styles.setting_section} onPress={() => props.navigation.navigate('subscription')}>
+                <Settings_icon />
+                <Text style={styles.setting_text}>Subscription</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.setting_section} onPress={() => props.navigation.navigate('Update_kyc')}>
                 <Settings_icon />
                 <Text style={styles.setting_text}>Setting</Text>

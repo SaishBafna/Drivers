@@ -392,6 +392,29 @@ export function Star_icon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function Star_icon_big(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="35"
+      height="35"
+      viewBox="0 0 24 24">
+      <Path
+        fill="#fcd53f"
+        d="M17.562 21.56a1 1 0 0 1-.465-.115L12 18.765l-5.097 2.68a1 1 0 0 1-1.451-1.054l.973-5.676l-4.123-4.02a1 1 0 0 1 .554-1.705l5.699-.828l2.548-5.164a1.042 1.042 0 0 1 1.794 0l2.548 5.164l5.699.828a1 1 0 0 1 .554 1.706l-4.123 4.019l.973 5.676a1 1 0 0 1-.986 1.169"
+      />
+    </Svg>
+  );
+}
+
+export function Star_icon_stroke(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24">
+	<Path fill="none" stroke="#fcd53f" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m13.728 3.444l1.76 3.549c.24.494.88.968 1.42 1.058l3.189.535c2.04.343 2.52 1.835 1.05 3.307l-2.48 2.5c-.42.423-.65 1.24-.52 1.825l.71 3.095c.56 2.45-.73 3.397-2.88 2.117l-2.99-1.785c-.54-.322-1.43-.322-1.98 0L8.019 21.43c-2.14 1.28-3.44.322-2.88-2.117l.71-3.095c.13-.585-.1-1.402-.52-1.825l-2.48-2.5C1.39 10.42 1.86 8.929 3.899 8.586l3.19-.535c.53-.09 1.17-.564 1.41-1.058l1.76-3.549c.96-1.925 2.52-1.925 3.47 0" color="#fcd53f" />
+</Svg>
+  );
+}
+
 export function Verify_Tick(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg
@@ -415,8 +438,8 @@ export function Location_icon(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg
       xmlns="http://www.w3.org/2000/svg"
-      width="25"
-      height="25"
+      width="20"
+      height="20"
       viewBox="0 0 24 24">
       <Path
         fill="#000"
@@ -457,8 +480,8 @@ export function Direction_icon(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg
       xmlns="http://www.w3.org/2000/svg"
-      width="25"
-      height="25"
+      width="18"
+      height="18"
       viewBox="0 0 100 100">
       <Path
         fill="#858585"
@@ -474,8 +497,8 @@ export function Information_icon(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg
       xmlns="http://www.w3.org/2000/svg"
-      width="25"
-      height="25"
+      width="18"
+      height="18"
       viewBox="0 0 24 24">
       <Path
         fill="#858585"
@@ -489,8 +512,8 @@ export function Phonecall_icon(props: SVGProps<SVGSVGElement>) {
   return (
     <Svg
       xmlns="http://www.w3.org/2000/svg"
-      width="25"
-      height="25"
+      width="18"
+      height="18"
       viewBox="0 0 24 24">
       <Path
         fill="green"
@@ -753,6 +776,44 @@ export function Delete_icon(props: SVGProps<SVGSVGElement>) {
     </Svg>
   );
 }
+
+export function Mic(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 32 32">
+	    <Path fill="#fff" d="M15.5 21.125c2.682 0 4.875-2.25 4.875-5V5.875c0-2.75-2.193-5-4.875-5s-4.875 2.25-4.875 5v10.25c0 2.75 2.193 5 4.875 5M21.376 11v5.125c0 3.308-2.636 6-5.876 6s-5.875-2.69-5.875-6V11h-3v5.125c0 4.443 3.195 8.132 7.373 8.86v2.14h-3.372v3h9.75v-3h-3.377v-2.14c4.18-.726 7.374-4.417 7.374-8.86V11h-2.998z" />
+    </Svg>
+  );
+}
+
+
+export function MicOff(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24">
+	    <Path fill="#fff" d="M15.58 12.75A4 4 0 0 0 16 11V6a4 4 0 0 0-7.92-.75M19 11a1 1 0 0 0-2 0a4.86 4.86 0 0 1-.69 2.48L17.78 15A7 7 0 0 0 19 11m-7 4h.16L8 10.83V11a4 4 0 0 0 4 4m8.71 4.29l-16-16a1 1 0 0 0-1.42 1.42l16 16a1 1 0 0 0 1.42 0a1 1 0 0 0 0-1.42" />
+	    <Path fill="#fff" d="M15 20h-2v-2.08a7 7 0 0 0 1.65-.44l-1.6-1.6A4.6 4.6 0 0 1 12 16a5 5 0 0 1-5-5a1 1 0 0 0-2 0a7 7 0 0 0 6 6.92V20H9a1 1 0 0 0 0 2h6a1 1 0 0 0 0-2" />
+    </Svg>
+  );
+}
+
+
+export function Speaker(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 16 16">
+	    <Path fill="#fff" d="M9 2.5a.5.5 0 0 0-.849-.358l-2.927 2.85H3.5a1.5 1.5 0 0 0-1.5 1.5v2.99a1.5 1.5 0 0 0 1.5 1.5h1.723l2.927 2.875A.5.5 0 0 0 9 13.5zm1.111 2.689a.5.5 0 0 1 .703-.08l.002.001l.002.002l.005.004l.015.013l.046.04q.055.05.142.142c.113.123.26.302.405.54c.291.48.573 1.193.573 2.148c0 .954-.282 1.668-.573 2.148a3.4 3.4 0 0 1-.405.541a3 3 0 0 1-.202.196l-.008.007h-.001s-.447.243-.703-.078a.5.5 0 0 1 .075-.7l.002-.002l-.001.001l.002-.001h-.001l.018-.016q.028-.025.085-.085a2.4 2.4 0 0 0 .284-.382c.21-.345.428-.882.428-1.63s-.218-1.283-.428-1.627a2.4 2.4 0 0 0-.368-.465l-.018-.016a.5.5 0 0 1-.079-.701m1.702-2.08a.5.5 0 1 0-.623.782l.011.01l.052.045q.072.063.201.195c.17.177.4.443.63.794c.46.701.92 1.733.92 3.069a5.5 5.5 0 0 1-.92 3.065c-.23.35-.46.614-.63.79a4 4 0 0 1-.252.24l-.011.01h-.001a.5.5 0 0 0 .623.782l.033-.027l.075-.065c.063-.057.15-.138.253-.245a6.4 6.4 0 0 0 .746-.936a6.5 6.5 0 0 0 1.083-3.614a6.54 6.54 0 0 0-1.083-3.618a6.5 6.5 0 0 0-.745-.938a5 5 0 0 0-.328-.311l-.023-.019l-.007-.006l-.002-.002zM10.19 5.89l-.002-.001Z" />
+    </Svg>
+  );
+}
+
+
+export function SpeakerOff(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 16 16">
+     <Path fill="#fff" d="m9 9.707l5.146 5.147a.5.5 0 0 0 .708-.708l-13-13a.5.5 0 1 0-.708.708l3.14 3.139H3.5a1.5 1.5 0 0 0-1.5 1.5v2.989a1.5 1.5 0 0 0 1.5 1.5h1.723l2.926 2.875A.5.5 0 0 0 9 13.5zm2.709-.12l-.795-.794c.055-.232.09-.497.09-.794c0-.748-.219-1.284-.428-1.628a2.4 2.4 0 0 0-.369-.465l-.018-.016h.001a.5.5 0 0 1 .623-.781h.001l.001.001l.002.002l.006.004l.015.013l.045.04q.056.05.142.142c.114.123.26.302.405.54c.292.48.574 1.193.574 2.148a4.3 4.3 0 0 1-.295 1.589m1.517 1.518l-.745-.745a5.5 5.5 0 0 0 .522-2.356a5.54 5.54 0 0 0-.919-3.069a5.5 5.5 0 0 0-.63-.794a4 4 0 0 0-.253-.24l-.011-.01a.5.5 0 0 1 .623-.782l.001.001l.003.002l.007.006l.022.019q.028.022.076.066c.062.056.15.138.252.245c.205.213.476.527.746.938a6.54 6.54 0 0 1 1.083 3.618a6.5 6.5 0 0 1-.777 3.1M8.999 6.878L6.181 4.06l1.97-1.918a.5.5 0 0 1 .848.358z" />
+    </Svg>
+  );
+}
+
+
 
 const WaveLoader = ({
   size = 100,
