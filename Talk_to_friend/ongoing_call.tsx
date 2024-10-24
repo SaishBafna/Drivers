@@ -6,481 +6,221 @@ import { Mic, MicOff, Phonecall_end, Speaker, SpeakerOff } from '../Common/icon'
 
 const OngoingCallScreen = ({ route, navigation }) => {
   const { mode, socket, userId, receiverId, isCaller } = route.params;
-  
+
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('Initializing...');
-  
+  const [isConnected, setIsConnected] = useState(false);
+
   const peerConnection = useRef(null);
   const streamRef = useRef(null);
-  const makingOffer = useRef(false);
-  const ignoreOffer = useRef(false);
-  const isSocketConnected = useRef(false);
+  const isSetupComplete = useRef(false);
 
-  useEffect(() => {
-    if (!socket) {
-      console.error('Socket is not initialized');
-      setConnectionStatus('Connection error');
-      return;
-    }
-
-    // Add socket connection listener
-    socket.on('connect', () => {
-      console.log('Socket connected');
-      isSocketConnected.current = true;
-    });
-
-    socket.on('disconnect', () => {
-      console.log('Socket disconnected');
-      isSocketConnected.current = false;
-      setConnectionStatus('Connection lost');
-    });
-
-    return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-    };
-  }, [socket]);
-
-  // WebRTC Configuration
   const iceServers = {
     iceServers: [
-      {
-        urls: [
-          'stun:stun.l.google.com:19302',
-          'stun:stun1.l.google.com:19302',
-        ],
-      },
-      // Add your TURN server configuration here
-      {
-        urls: 'turn:relay1.expressturn.com:3478',
-        username: 'ef98GKGS9L8H41Y6HC',
-        credential: 'ijC9ZGl6vt5ztgpp'
-      }
+      { urls: ['stun:stun.l.google.com:19302'] },
+      { urls: 'turn:relay1.expressturn.com:3478', username: 'ef98GKGS9L8H41Y6HC', credential: 'ijC9ZGl6vt5ztgpp' }
     ],
-    iceCandidatePoolSize: 10,
-    bundlePolicy: 'max-bundle',
-    rtcpMuxPolicy: 'require',
-    sdpSemantics: 'unified-plan',
-    enableDtlsSrtp: true,
   };
 
   useEffect(() => {
-    let setupTimeout;
+    if (!socket) {
+      console.log('Socket not initialized');
+      return;
+    }
+
+    // Join the socket room with userId
+    socket.emit('join', { userId });
     
-    const initializeCall = async () => {
-      try {
-        console.log('Initializing call as', isCaller ? 'caller' : 'receiver');
-        await setupAudioSession();
-        await setupWebRTC();
-        
-        if (isCaller) {
-          setupTimeout = setTimeout(async () => {
-            try {
-              await createAndSendOffer();
-            } catch (err) {
-              console.error('Error creating initial offer:', err);
-              setConnectionStatus('Failed to start call');
-            }
-          }, 1000);
-        }
-      } catch (err) {
-        console.error('Error initializing call:', err);
-        setConnectionStatus('Setup failed');
-      }
-    };
-
-    initializeCall();
-
     return () => {
-      clearTimeout(setupTimeout);
       cleanup();
     };
+  }, [socket, userId]);
+
+  useEffect(() => {
+    if (isSetupComplete.current) return;
+
+    const initialize = async () => {
+      try {
+        await setupInCallManager();
+        await setupWebRTC();
+        isSetupComplete.current = true;
+      } catch (err) {
+        console.error('Initialization error:', err);
+        setConnectionStatus('Failed to initialize');
+      }
+    };
+
+    initialize();
   }, []);
 
-  const setupAudioSession = async () => {
+  useEffect(() => {
+    if (!socket) return;
+
+    const setupSocketListeners = () => {
+      socket.on('offer', async ({ offer, callerId }) => {
+        console.log('Received offer from:', callerId);
+        try {
+          await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+          const answer = await peerConnection.current.createAnswer();
+          await peerConnection.current.setLocalDescription(answer);
+          
+          socket.emit('answer', {
+            answer,
+            receiverId: callerId,
+            callerId: receiverId
+          });
+        } catch (error) {
+          console.error('Error handling offer:', error);
+        }
+      });
+
+      socket.on('answer', async ({ answer }) => {
+        console.log('Received answer');
+        try {
+          await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+        } catch (error) {
+          console.error('Error handling answer:', error);
+        }
+      });
+
+      socket.on('iceCandidate', async ({ candidate }) => {
+        try {
+          if (candidate) {
+            await peerConnection.current.addIceCandidate(candidate);
+          }
+        } catch (error) {
+          console.error('Error adding ICE candidate:', error);
+        }
+      });
+
+      socket.on('callEnded', () => {
+        handleEndCallFromRemote();
+      });
+
+      socket.on('userUnavailable', () => {
+        setConnectionStatus('User unavailable');
+        setTimeout(() => navigation.goBack(), 2000);
+      });
+
+      socket.on('userBusy', () => {
+        setConnectionStatus('User is busy');
+        setTimeout(() => navigation.goBack(), 2000);
+      });
+    };
+
+    setupSocketListeners();
+
+    return () => {
+      socket.off('offer');
+      socket.off('answer');
+      socket.off('iceCandidate');
+      socket.off('callEnded');
+      socket.off('userUnavailable');
+      socket.off('userBusy');
+    };
+  }, [socket, userId, navigation]);
+
+  const setupInCallManager = async () => {
     try {
-      await InCallManager.start({ media: 'audio', ringback: '_BUNDLE_' });
-      await InCallManager.setKeepScreenOn(true);
-      await InCallManager.setForceSpeakerphoneOn(false);
-      
-      if (Platform.OS === 'ios') {
-        await InCallManager.setMicrophoneMute(false);
-        await InCallManager.enableProximityMonitor(true);
-      } else {
-        await InCallManager.setSpeakerphoneOn(false);
-      }
-      
-      console.log('Audio session setup complete');
+      InCallManager.start({ media: 'audio' });
+      InCallManager.setKeepScreenOn(true);
+      InCallManager.setForceSpeakerphoneOn(false);
+      console.log('InCallManager initialized successfully');
     } catch (err) {
-      console.error('Error setting up audio session:', err);
-      throw new Error('Failed to initialize audio');
+      console.error('Failed to initialize InCallManager:', err);
+      throw err;
     }
   };
 
   const setupWebRTC = async () => {
     try {
-      console.log('Setting up WebRTC...', { isCaller });
-      setConnectionStatus('Setting up connection...');
-
-      await cleanupResources();
-
-      const pc = new RTCPeerConnection(iceServers);
-      peerConnection.current = pc;
-
-      // Set up event handlers
-      setupPeerConnectionHandlers(pc);
-
-      // Get media stream
-      const stream = await mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: 1,
-          sampleRate: 48000,
-          sampleSize: 16
-        },
-        video: false
-      });
-
-      const audioTrack = stream.getAudioTracks()[0];
-      if (!audioTrack) {
-        throw new Error('No audio track available');
+      if (peerConnection.current) {
+        peerConnection.current.close();
       }
 
-      // Add track to peer connection
-      const sender = pc.addTrack(audioTrack, stream);
-      if (!sender) {
-        throw new Error('Failed to add audio track');
-      }
+      peerConnection.current = new RTCPeerConnection(iceServers);
+      
+      peerConnection.current.onicecandidate = ({ candidate }) => {
+        if (candidate) {
+          socket.emit('iceCandidate', {
+            candidate,
+            callerId: userId,
+            receiverId: receiverId
+          });
+        }
+      };
 
-      // Configure audio transceiver
-      pc.addTransceiver('audio', {
-        direction: 'sendrecv',
-        streams: [stream],
-        sendEncodings: [{
-          maxBitrate: 32000,
-          priority: 'high',
-          networkPriority: 'high'
-        }]
-      });
+      peerConnection.current.onconnectionstatechange = () => {
+        const state = peerConnection.current.connectionState;
+        setConnectionStatus(state.charAt(0).toUpperCase() + state.slice(1));
+        setIsConnected(state === 'connected');
+      };
 
+      peerConnection.current.ontrack = (event) => {
+        if (event.streams?.[0]) {
+          setRemoteStream(event.streams[0]);
+          InCallManager.setSpeakerphoneOn(isSpeakerOn);
+        }
+      };
+
+      const stream = await mediaDevices.getUserMedia({ audio: true, video: false });
       streamRef.current = stream;
       setLocalStream(stream);
 
-      // Debug handlers
-      pc.onicegatheringstatechange = () => {
-        console.log('ICE gathering state:', pc.iceGatheringState);
-      };
+      stream.getTracks().forEach((track) => {
+        peerConnection.current.addTrack(track, stream);
+      });
 
-      pc.onsignalingstatechange = () => {
-        console.log('Signaling state:', pc.signalingState);
-      };
+      if (isCaller) {
+        await createAndSendOffer();
+      }
 
-      console.log('WebRTC setup complete');
       setConnectionStatus('Waiting for peer...');
-      return pc;
-
     } catch (err) {
       console.error('Error in setupWebRTC:', err);
-      setConnectionStatus('Failed to setup call');
       throw err;
     }
   };
 
-  const setupPeerConnectionHandlers = (pc) => {
-    pc.onicecandidate = ({ candidate }) => {
-      if (candidate) {
-        console.log('Sending ICE candidate');
-        socket.emit('ice-candidate', {
-          candidate,
-          receiverId,
-          callerId: userId,
-        });
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      console.log('Connection state changed:', state);
-      setConnectionStatus(state.charAt(0).toUpperCase() + state.slice(1));
-      setIsConnected(state === 'connected');
-
-      if (state === 'failed') {
-        handleConnectionFailure();
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('ICE Connection State:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'failed') {
-        handleIceFailure();
-      }
-    };
-
-    pc.onnegotiationneeded = async () => {
-      try {
-        if (makingOffer.current) return;
-        makingOffer.current = true;
-        await createAndSendOffer();
-      } catch (err) {
-        console.error('Error handling negotiationneeded:', err);
-      } finally {
-        makingOffer.current = false;
-      }
-    };
-
-    pc.ontrack = (event) => {
-      console.log('Got remote track:', event.track.kind);
-      if (event.streams?.[0]) {
-        console.log('Setting remote stream');
-        setRemoteStream(event.streams[0]);
-      }
-    };
-  };
-
   const createAndSendOffer = async () => {
-    if (!peerConnection.current) {
-      throw new Error('No peer connection available');
-    }
-
-    if (!socket) {
-      throw new Error('Socket is not connected');
-    }
-
     try {
-      makingOffer.current = true;
-      console.log('Creating offer...');
-      
       const offer = await peerConnection.current.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: false,
-        voiceActivityDetection: true
+        offerToReceiveVideo: false
       });
 
-      console.log('Offer created:', offer.type);
-
-      // Set local description before sending
-      console.log('Setting local description...');
       await peerConnection.current.setLocalDescription(offer);
-      
-      // Add timeout for ICE gathering
-      const iceGatheringTimeout = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('ICE gathering timed out'));
-        }, 30000); // 10 second timeout
 
-        const checkState = () => {
-          if (peerConnection.current.iceGatheringState === 'complete') {
-            clearTimeout(timeout);
-            resolve();
-          } else {
-            setTimeout(checkState, 100);
-          }
-        };
-        checkState();
-      });
-
-      try {
-        await iceGatheringTimeout;
-      } catch (error) {
-        console.warn('ICE gathering timed out, sending offer anyway');
-      }
-
-      const currentOffer = peerConnection.current.localDescription;
-      
-      console.log('Sending offer to server...');
       socket.emit('offer', {
-        offer: {
-          type: currentOffer.type,
-          sdp: currentOffer.sdp
-        },
+        offer,
         callerId: userId,
         receiverId: receiverId
-      }, (acknowledgement) => {
-        // Add acknowledgement callback
-        if (acknowledgement) {
-          console.log('Offer sent successfully');
-        } else {
-          console.error('Failed to send offer');
-          setConnectionStatus('Failed to connect');
-        }
       });
-
     } catch (error) {
-      console.error('Error in createAndSendOffer:', error);
+      console.error('Error creating offer:', error);
       setConnectionStatus('Failed to create offer');
-      throw error;
-    } finally {
-      makingOffer.current = false;
     }
   };
 
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleOffer = async (data) => {
-      try {
-        console.log('Received offer');
-        const pc = peerConnection.current;
-        if (!pc) return;
-
-        const offerCollision = makingOffer.current || pc.signalingState !== 'stable';
-        ignoreOffer.current = !isCaller && offerCollision;
-        
-        if (ignoreOffer.current) {
-          console.log('Ignoring colliding offer');
-          return;
-        }
-
-        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-        const answer = await pc.createAnswer();
-        
-        // Modify answer SDP
-        answer.sdp = answer.sdp.replace('a=inactive', 'a=sendrecv');
-        
-        await pc.setLocalDescription(answer);
-
-        socket.emit('answer', {
-          answer,
-          receiverId: data.callerId,
-          callerId: userId,
-        });
-      } catch (err) {
-        console.error('Error handling offer:', err);
-        setConnectionStatus('Failed to connect');
-      }
-    };
-
-    const handleAnswer = async (data) => {
-      try {
-        console.log('Received answer');
-        if (peerConnection.current) {
-          await peerConnection.current.setRemoteDescription(
-            new RTCSessionDescription(data.answer)
-          );
-        }
-      } catch (err) {
-        console.error('Error handling answer:', err);
-      }
-    };
-
-    const handleIceCandidate = async (data) => {
-      try {
-        if (data.candidate && peerConnection.current) {
-          console.log('Adding ICE candidate');
-          await peerConnection.current.addIceCandidate(data.candidate);
-        }
-      } catch (err) {
-        console.error('Error handling ICE candidate:', err);
-      }
-    };
-
-    socket.on('offer', handleOffer);
-    socket.on('answer', handleAnswer);
-    socket.on('ice-candidate', handleIceCandidate);
-    socket.on('endCall', handleEndCallFromRemote);
-
-    return () => {
-      socket.off('offer', handleOffer);
-      socket.off('answer', handleAnswer);
-      socket.off('ice-candidate', handleIceCandidate);
-      socket.off('endCall', handleEndCallFromRemote);
-    };
-  }, [socket]);
-
-  const handleConnectionFailure = async () => {
-    console.log('Handling connection failure');
-    try {
-      await cleanupResources();
-      await setupWebRTC();
-      setConnectionStatus('Reconnecting...');
-    } catch (err) {
-      console.error('Error handling connection failure:', err);
-      setConnectionStatus('Connection failed');
+  const cleanup = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
     }
-  };
 
-  const handleIceFailure = async () => {
-    console.log('Handling ICE failure');
-    try {
-      if (peerConnection.current) {
-        await createAndSendOffer();
-      }
-    } catch (err) {
-      console.error('Error handling ICE failure:', err);
+    if (peerConnection.current) {
+      peerConnection.current.close();
     }
-  };
 
-  const cleanupResources = async () => {
-    console.log('Cleaning up resources...');
-    
-    try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-          console.log('Stopped track:', track.kind);
-        });
-        streamRef.current = null;
-      }
-
-      if (peerConnection.current) {
-        const senders = peerConnection.current.getSenders();
-        for (const sender of senders) {
-          try {
-            await peerConnection.current.removeTrack(sender);
-          } catch (err) {
-            console.warn('Error removing track:', err);
-          }
-        }
-
-        peerConnection.current.close();
-        peerConnection.current = null;
-      }
-
-      if (Platform.OS === 'ios') {
-        InCallManager.stop();
-        InCallManager.enableProximityMonitor(false);
-      } else {
-        InCallManager.stop();
-      }
-
-      setLocalStream(null);
-      setRemoteStream(null);
-      
-    } catch (err) {
-      console.error('Error in cleanup:', err);
-    }
-  };
-
-  const toggleMute = () => {
-    if (localStream) {
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled;
-        setIsMuted(!track.enabled);
-        if (Platform.OS === 'ios') {
-          InCallManager.setMicrophoneMute(!track.enabled);
-        }
-      });
-    }
-  };
-
-  const toggleSpeaker = () => {
-    const newSpeakerStatus = !isSpeakerOn;
-    InCallManager.setForceSpeakerphoneOn(newSpeakerStatus);
-    setIsSpeakerOn(newSpeakerStatus);
+    InCallManager.stop();
+    setRemoteStream(null);
+    setLocalStream(null);
   };
 
   const handleEndCall = () => {
-    socket.emit('endCall', {
-      callerId: mode === 'caller' ? userId : receiverId,
-      receiverId: mode === 'caller' ? receiverId : userId,
-    });
+    socket.emit('endCall', { callerId: userId, receiverId: receiverId });
     cleanup();
     navigation.goBack();
   };
@@ -490,14 +230,26 @@ const OngoingCallScreen = ({ route, navigation }) => {
     navigation.goBack();
   };
 
-  const cleanup = async () => {
-    await cleanupResources();
+  const toggleMute = () => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+        setIsMuted(!track.enabled);
+      });
+    }
   };
+
+  const toggleSpeaker = () => {
+    const newSpeakerStatus = !isSpeakerOn;
+    InCallManager.setSpeakerphoneOn(newSpeakerStatus);
+    setIsSpeakerOn(newSpeakerStatus);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
         <Text style={styles.callerName}>
-          {mode === 'caller' ? 'Unknown Receiver' : 'Unknown Caller'}
+          {mode === 'caller' ? 'Calling...' : 'Incoming Call'}
         </Text>
         <Text style={styles.callStatus}>{connectionStatus}</Text>
       </View>
@@ -583,4 +335,3 @@ const styles = StyleSheet.create({
 });
 
 export default OngoingCallScreen;
-

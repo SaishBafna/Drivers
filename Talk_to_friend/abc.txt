@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import InCallManager from 'react-native-incall-manager';
 import { RTCPeerConnection, RTCSessionDescription, mediaDevices } from 'react-native-webrtc';
 import { Mic, MicOff, Phonecall_end, Speaker, SpeakerOff } from '../Common/icon';
@@ -11,262 +11,276 @@ const OngoingCallScreen = ({ route, navigation }) => {
   const [isSpeakerOn, setIsSpeakerOn] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('Initializing...');
-  const [isNegotiating, setIsNegotiating] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const peerConnection = useRef(null);
   const streamRef = useRef(null);
+  const isSetupComplete = useRef(false);
+  const iceCandidateBuffer = useRef([]);
+  const pendingCandidates = useRef([]);
+  const isNegotiating = useRef(false);
 
   const iceServers = {
     iceServers: [
-      { 
-        urls: [
-          'stun:stun.l.google.com:19302',
-          'stun:stun1.l.google.com:19302',
-          'stun:stun2.l.google.com:19302'
-        ],
-      },
-      {
-        urls: 'turn:numb.viagenie.ca',
-        username: 'webrtc@live.com',
-        credential: 'muazkh'
-      }
+      { urls: 'stun:stun.l.google.com:19302' },
+      // {  urls: 'turn:relay1.expressturn.com:3478',
+      //   credential: 'ef98GKGS9L8H41Y6HC',
+      //   username: 'ijC9ZGl6vt5ztgpp'
+      // }
     ],
-    iceCandidatePoolSize: 10,
+    iceCandidatePoolSize: 10
   };
 
   useEffect(() => {
-    setupAudioSession();
-    setupWebRTC();
-    return () => cleanup();
+    if (!socket) {
+      console.log('Socket not initialized');
+      return;
+    }
+
+    // Join the socket room with userId
+    socket.emit('join', { userId });
+    
+    return () => {
+      cleanup();
+    };
+  }, [socket, userId]);
+
+  useEffect(() => {
+    if (isSetupComplete.current) return;
+
+    const initialize = async () => {
+      try {
+        await setupInCallManager();
+        await setupWebRTC();
+        isSetupComplete.current = true;
+      } catch (err) {
+        console.error('Initialization error:', err);
+        setConnectionStatus('Failed to initialize');
+      }
+    };
+
+    initialize();
   }, []);
 
-  const setupAudioSession = async () => {
-    try {
-      await InCallManager.start({ media: 'audio' });
-      await InCallManager.setKeepScreenOn(true);
-      await InCallManager.setForceSpeakerphoneOn(false);
-      console.log('Audio session initialized');
-    } catch (err) {
-      console.error('Error setting up audio session:', err);
-    }
-  };
-
+ 
+  
+  // Replace the existing socket listeners with these updated versions
   useEffect(() => {
     if (!socket) return;
 
-    const handleSocketEvents = () => {
-      socket.on('offer', handleOffer);
-      socket.on('answer', handleAnswer);
-      socket.on('ice-candidate', handleNewIceCandidate);
-      socket.on('endCall', handleEndCallFromRemote);
-      socket.on('callEnded', handleEndCallFromRemote);
+    const setupSocketListeners = () => {
+      // Handle incoming offer
+      socket.on('offer', async ({ offer, callerId }) => {
+        console.log('Received offer, current state:', peerConnection.current?.signalingState);
+        try {
+          if (!peerConnection.current) {
+            console.error('PeerConnection not initialized');
+            return;
+          }
+
+          // Don't process offers while negotiating
+          if (isNegotiating.current) {
+            console.log('Negotiation in progress, ignoring offer');
+            return;
+          }
+
+          isNegotiating.current = true;
+
+          // Set remote description first
+          try {
+            await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
+            console.log('Remote description set successfully');
+          } catch (error) {
+            console.error('Error setting remote description:', error);
+            isNegotiating.current = false;
+            return;
+          }
+
+          // Create and set local answer
+          try {
+            const answer = await peerConnection.current.createAnswer();
+            await peerConnection.current.setLocalDescription(answer);
+            console.log('Local description (answer) set successfully');
+
+            // Send answer back
+            socket.emit('answer', {
+              answer,
+              receiverId: callerId,
+              callerId: userId
+            });
+          } catch (error) {
+            console.error('Error creating/setting answer:', error);
+            isNegotiating.current = false;
+            return;
+          }
+
+          // Process any pending ICE candidates
+          while (pendingCandidates.current.length > 0) {
+            const candidate = pendingCandidates.current.shift();
+            try {
+              await peerConnection.current.addIceCandidate(candidate);
+            } catch (error) {
+              console.error('Error adding pending ICE candidate:', error);
+            }
+          }
+
+          isNegotiating.current = false;
+        } catch (error) {
+          console.error('Error in offer handler:', error);
+          isNegotiating.current = false;
+        }
+      });
+
+      // Handle incoming answer
+      socket.on('answer', async ({ answer }) => {
+        console.log('Received answer, current state:', peerConnection.current?.signalingState);
+        try {
+          if (!peerConnection.current) return;
+          await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+          console.log('Remote answer set successfully');
+        } catch (error) {
+          console.error('Error setting remote answer:', error);
+        }
+      });
+
+      // Handle ICE candidates
+      socket.on('iceCandidate', async ({ candidate }) => {
+        try {
+          if (!peerConnection.current) return;
+
+          if (peerConnection.current.remoteDescription) {
+            await peerConnection.current.addIceCandidate(candidate);
+          } else {
+            pendingCandidates.current.push(candidate);
+          }
+        } catch (error) {
+          console.error('Error adding ICE candidate:', error);
+        }
+      });
     };
 
-    handleSocketEvents();
+    setupSocketListeners();
 
     return () => {
       socket.off('offer');
       socket.off('answer');
-      socket.off('ice-candidate');
-      socket.off('endCall');
-      socket.off('callEnded');
+      socket.off('iceCandidate');
     };
-  }, [socket]);
+  }, [socket, userId]);
 
-  const setupWebRTC = async () => {
+
+  const setupInCallManager = async () => {
     try {
-      console.log('Setting up WebRTC...');
-      setConnectionStatus('Setting up connection...');
-
-      const pc = new RTCPeerConnection(iceServers);
-      peerConnection.current = pc;
-      
-      pc.onnegotiationneeded = async () => {
-        try {
-          if (isNegotiating || !isCaller) return;
-          console.log('Negotiation needed');
-          setIsNegotiating(true);
-          await createAndSendOffer();
-        } catch (err) {
-          console.error('Error during negotiation:', err);
-        }
-      };
-
-      pc.onsignalingstatechange = () => {
-        setIsNegotiating(pc.signalingState !== 'stable');
-      };
-
-      setupPeerConnectionHandlers();
-
-      const stream = await mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-        echoCancellation: true,
-        noiseSuppression: true,
-      });
-
-      streamRef.current = stream;
-      setLocalStream(stream);
-
-      stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream);
-      });
-
-      if (isCaller) {
-        await createAndSendOffer();
-      }
-
-      setConnectionStatus('Waiting for peer...');
+      InCallManager.start({ media: 'audio' });
+      InCallManager.setKeepScreenOn(true);
+      InCallManager.setForceSpeakerphoneOn(false);
+      console.log('InCallManager initialized successfully');
     } catch (err) {
-      console.error('Error in setupWebRTC:', err);
-      setConnectionStatus('Failed to setup call');
+      console.error('Failed to initialize InCallManager:', err);
+      throw err;
     }
   };
 
-  const setupPeerConnectionHandlers = () => {
-    if (!peerConnection.current) return;
-
-    peerConnection.current.onicecandidate = handleIceCandidate;
-
-    peerConnection.current.onconnectionstatechange = () => {
-      const state = peerConnection.current.connectionState;
-      setConnectionStatus(state.charAt(0).toUpperCase() + state.slice(1));
-      setIsConnected(state === 'connected');
-    };
-
-    peerConnection.current.oniceconnectionstatechange = () => {
-      console.log('ICE connection state:', peerConnection.current.iceConnectionState);
-    };
-
-    peerConnection.current.ontrack = (event) => {
-      if (event.streams?.[0]) {
-        setRemoteStream(event.streams[0]);
+  const setupWebRTC = async () => {
+    try {
+      // Close existing connection if any
+      if (peerConnection.current) {
+        peerConnection.current.close();
       }
-    };
+
+      // Create new peer connection
+      peerConnection.current = new RTCPeerConnection(iceServers);
+      
+      // Reset negotiation flag
+      isNegotiating.current = false;
+
+      // Handle negotiation needed
+      peerConnection.current.onnegotiationneeded = async () => {
+        if (isCaller && !isNegotiating.current) {
+          await createAndSendOffer();
+        }
+      };
+
+      // Handle ICE candidates
+      peerConnection.current.onicecandidate = ({ candidate }) => {
+        if (candidate && socket) {
+          socket.emit('iceCandidate', {
+            candidate,
+            callerId: userId,
+            receiverId
+          });
+        }
+      };
+
+      // Handle connection state changes
+      peerConnection.current.onconnectionstatechange = () => {
+        const state = peerConnection.current.connectionState;
+        console.log('Connection state changed:', state);
+        setConnectionStatus(state.charAt(0).toUpperCase() + state.slice(1));
+        setIsConnected(state === 'connected');
+      };
+
+      // Handle tracks
+      peerConnection.current.ontrack = (event) => {
+        if (event.streams?.[0]) {
+          setRemoteStream(event.streams[0]);
+        }
+      };
+
+      // Set up local stream
+      const stream = await mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: false 
+      });
+      
+      streamRef.current = stream;
+      setLocalStream(stream);
+
+      // Add tracks to peer connection
+      stream.getTracks().forEach((track) => {
+        peerConnection.current.addTrack(track, stream);
+      });
+
+      // If we're the caller, create and send the offer
+      if (isCaller && !isNegotiating.current) {
+        await createAndSendOffer();
+      }
+
+    } catch (err) {
+      console.error('Error in setupWebRTC:', err);
+      throw err;
+    }
   };
 
   const createAndSendOffer = async () => {
     try {
-      if (!peerConnection.current || peerConnection.current.signalingState !== 'stable') {
-        console.log('Cannot create offer in current state:', peerConnection.current?.signalingState);
-        return;
-      }
+      if (!peerConnection.current || isNegotiating.current) return;
+
+      isNegotiating.current = true;
+      console.log('Creating offer...');
 
       const offer = await peerConnection.current.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: false,
-        voiceActivityDetection: true
+        offerToReceiveVideo: false
       });
-      
+
       await peerConnection.current.setLocalDescription(offer);
-      
+      console.log('Local description (offer) set successfully');
+
       socket.emit('offer', {
         offer,
         callerId: userId,
-        receiverId: receiverId,
+        receiverId
       });
+
+      isNegotiating.current = false;
     } catch (error) {
-      console.error('Error in createAndSendOffer:', error);
-      setConnectionStatus('Failed to create offer');
+      console.error('Error creating/sending offer:', error);
+      isNegotiating.current = false;
     }
   };
-
-  const handleOffer = async (data) => {
-    try {
-      if (!peerConnection.current) {
-        await setupWebRTC();
-      }
-
-      if (peerConnection.current.signalingState !== 'stable') {
-        console.log('Cannot handle offer in current state:', peerConnection.current.signalingState);
-        return;
-      }
-
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-      
-      const answer = await peerConnection.current.createAnswer();
-      await peerConnection.current.setLocalDescription(answer);
-      
-      socket.emit('answer', {
-        answer,
-        receiverId: data.callerId,
-        callerId: userId,
-      });
-    } catch (error) {
-      console.error('Error in handleOffer:', error);
-      setConnectionStatus('Failed to handle offer');
-    }
-  };
-
-  const handleAnswer = async (data) => {
-    try {
-      if (peerConnection.current.signalingState === 'stable') {
-        console.log('Answer received in stable state, ignoring');
-        return;
-      }
-      
-      const remoteDesc = new RTCSessionDescription(data.answer);
-      await peerConnection.current.setRemoteDescription(remoteDesc);
-    } catch (error) {
-      console.error('Error in handleAnswer:', error);
-      setConnectionStatus('Failed to handle answer');
-    }
-  };
-
-  const handleIceCandidate = (event) => {
-    if (event.candidate) {
-      console.log('Sending ICE candidate to peer...');
-      socket.emit('ice-candidate', {
-        candidate: event.candidate,
-        receiverId: receiverId,
-        callerId: userId,
-      });
-    }
-  };
-
-  const handleNewIceCandidate = async (data) => {
-    try {
-      if (data.candidate) {
-        console.log('Adding received ICE candidate...');
-        await peerConnection.current.addIceCandidate(data.candidate);
-      }
-    } catch (error) {
-      console.error('Error in handleNewIceCandidate:', error);
-    }
-  };
-
-  const toggleMute = () => {
-    if (localStream) {
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled;
-        console.log('Audio track enabled:', track.enabled);
-        setIsMuted(!track.enabled);
-      });
-    }
-  };
-
-  const toggleSpeaker = () => {
-    const newSpeakerStatus = !isSpeakerOn;
-    InCallManager.setForceSpeakerphoneOn(newSpeakerStatus);
-    setIsSpeakerOn(newSpeakerStatus);
-  };
-
-  const handleEndCall = () => {
-    socket.emit('endCall', {
-      callerId: mode === 'caller' ? userId : receiverId,
-      receiverId: mode === 'caller' ? receiverId : userId,
-    });
-    cleanup();
-    navigation.goBack();
-  };
-
-  const handleEndCallFromRemote = () => {
-    cleanup();
-    navigation.goBack();
-  };
-
+  
   const cleanup = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -277,14 +291,41 @@ const OngoingCallScreen = ({ route, navigation }) => {
     }
 
     InCallManager.stop();
+    setRemoteStream(null);
+    setLocalStream(null);
   };
-  
-  
+
+  const handleEndCall = () => {
+    socket.emit('endCall', { callerId: userId, receiverId });
+    cleanup();
+    navigation.goBack();
+  };
+
+  const handleEndCallFromRemote = () => {
+    cleanup();
+    navigation.goBack();
+  };
+
+  const toggleMute = () => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+        setIsMuted(!track.enabled);
+      });
+    }
+  };
+
+  const toggleSpeaker = () => {
+    const newSpeakerStatus = !isSpeakerOn;
+    InCallManager.setSpeakerphoneOn(newSpeakerStatus);
+    setIsSpeakerOn(newSpeakerStatus);
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.topSection}>
         <Text style={styles.callerName}>
-          {mode === 'caller' ? 'Unknown Receiver' : 'Unknown Caller'}
+          {mode === 'caller' ? 'Calling...' : 'Incoming Call'}
         </Text>
         <Text style={styles.callStatus}>{connectionStatus}</Text>
       </View>
@@ -318,45 +359,54 @@ const OngoingCallScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#000000',
     justifyContent: 'space-between',
   },
   topSection: {
     alignItems: 'center',
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
   },
   callerName: {
     marginTop: 10,
-    fontSize: 20,
-    color: 'white',
+    fontSize: 24,
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
   callStatus: {
     fontSize: 16,
-    color: '#666',
-    marginTop: 5,
+    color: '#666666',
+    marginTop: 8,
   },
   bottomSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 30,
+    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
   },
   actionButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    padding: 15,
+    padding: 16,
     borderRadius: 50,
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   actionButtonActive: {
-    backgroundColor: '#666',
+    backgroundColor: '#666666',
   },
   endCallButton: {
-    backgroundColor: '#ff3b30',
-    padding: 15,
+    backgroundColor: '#FF3B30',
+    padding: 16,
     borderRadius: 50,
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -123,8 +123,8 @@ const CallingAcceptance = ({ route, navigation }) => {
     navigation.navigate('ongoing_call', {
       mode: 'reveiver',
       socket: socket,
-      receiver_id: agent_id,
-      user_id: user_id,
+      receiverId: agent_id,
+      userId: user_id,
       isCaller: false, // Set to false if this user is the receiver
     });
   };

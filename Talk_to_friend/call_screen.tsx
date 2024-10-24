@@ -26,7 +26,7 @@ const CallingScreen = ({ route, navigation }) => {
   useEffect(() => {
     handleSocketEvents();
     setupAnimations();
-    setupInitialCall();
+    // setupInitialCall();
 
     return () => {
       cleanupSocketEvents();
